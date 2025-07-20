@@ -5,10 +5,10 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # کپی کردن فایل‌های پروژه
-COPY admin_panel/ .
+COPY . .
 
 # نصب وابستگی‌ها
-RUN pip install --no-cache-dir -r ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # جمع‌آوری فایل‌های استاتیک
 RUN python manage.py collectstatic --noinput
