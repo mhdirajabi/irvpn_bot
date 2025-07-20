@@ -8,7 +8,7 @@ WORKDIR /app
 COPY admin_panel/ .
 
 # نصب وابستگی‌ها
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r ./requirements.txt
 
 # جمع‌آوری فایل‌های استاتیک
 RUN python manage.py collectstatic --noinput
