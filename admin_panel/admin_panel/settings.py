@@ -138,3 +138,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Media files
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", False)
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", False)
