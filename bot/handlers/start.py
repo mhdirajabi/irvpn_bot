@@ -1,6 +1,7 @@
 from aiogram import types, Router
 from aiogram.filters import CommandStart
-from config import CHANNEL_ID, bot
+from config import CHANNEL_ID
+from main import bot
 from utils.database import create_user
 
 router = Router()
