@@ -3,8 +3,7 @@ import datetime
 import uuid
 import requests
 
-from aiogram import Bot, Dispatcher, types
-from aiogram.enums.content_type import ContentType
+from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -641,7 +640,7 @@ async def process_renew_plan_selection(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@dp.message(content_types=[ContentType.PHOTO])
+@dp.message(F.photo)
 async def handle_receipt(message: types.Message):
     user_id = message.from_user.id
     if not await check_channel_membership(user_id):
