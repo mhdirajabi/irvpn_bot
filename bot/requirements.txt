@@ -2,3 +2,4 @@ aiogram
 asyncpg
 aiohttp
 python-dotenv
+requests

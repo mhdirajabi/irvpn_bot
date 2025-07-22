@@ -1,41 +1,19 @@
-import aiohttp
-from config import MARZBAN_API_URL  # MARZBAN_API_TOKEN
-from datetime import datetime, timedelta
+import requests
+from config import ADMIN_PASSWORD, ADMIN_USERNAME, API_BASE_URL
 
 
-async def get_admin_token(admin_username, admin_password):
-    async with aiohttp.ClientSession() as session:
-        url = f"{MARZBAN_API_URL}/api/admin/token"
-        username = admin_username
-        password = admin_password
-        data = {"username": username, "password": password}
-        async with session.post(url, json=data) as response:
-            if response.status == 200:
-                print(type(response))
-            return None
+def get_jwt_token():
+    url = f"{API_BASE_URL}/admin/token"
+    data = {
+        "username": ADMIN_USERNAME,
+        "password": ADMIN_PASSWORD,
+        "grant_type": "password",
+    }
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    response = requests.post(url, data=data, headers=headers, timeout=2000)
+    if response.status_code == 200:
+        return response.json()["access_token"]
+    raise Exception(f"Failed to get JWT token: {response.text}")
 
 
-# async def create_marzban_config(order_id, duration_days):
-#     async with aiohttp.ClientSession() as session:
-#         url = f"{MARZBAN_API_URL}/api/users"
-#         headers = {"Authorization": f"Bearer {MARZBAN_API_TOKEN}"}
-#         username = f"user_{order_id}"
-#         data = {
-#             "username": username,
-#             "expire": int((datetime.now() + timedelta(days=duration_days)).timestamp()),
-#             # فرض بر اینه که API مرزبان این فرمت رو قبول می‌کنه
-#         }
-#         async with session.post(url, json=data, headers=headers) as response:
-#             if response.status == 201:
-#                 return username
-#             return None
-
-
-# async def get_marzban_config(username):
-#     async with aiohttp.ClientSession() as session:
-#         url = f"{MARZBAN_API_URL}/api/users/{username}/config"
-#         headers = {"Authorization": f"Bearer {MARZBAN_API_TOKEN}"}
-#         async with session.get(url, headers=headers) as response:
-#             if response.status == 200:
-#                 return await response.text()
-#             return "خطا در دریافت کانفیگ"
+API_TOKEN = get_jwt_token()
