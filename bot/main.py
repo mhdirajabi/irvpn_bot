@@ -1,5 +1,5 @@
 import asyncio
-import datetime
+from datetime import datetime, timedelta
 import uuid
 import requests
 
@@ -145,7 +145,7 @@ def create_user(username: str, data_limit: int, expire_days: int, users: str):
     expire_timestamp = (
         0
         if expire_days == 0
-        else int((datetime.now() + datetime.timedelta(days=expire_days)).timestamp())
+        else int((datetime.now() + timedelta(days=expire_days)).timestamp())
     )
     inbounds = {
         "vless": ["VLESS TCP REALITY", "VLESS GRPC REALITY"],
@@ -177,7 +177,7 @@ def renew_user(username: str, data_limit: int, expire_days: int, users: str):
     expire_timestamp = (
         0
         if expire_days == 0
-        else int((datetime.now() + datetime.timedelta(days=expire_days)).timestamp())
+        else int((datetime.now() + timedelta(days=expire_days)).timestamp())
     )
     inbounds = {
         "vless": ["VLESS TCP REALITY", "VLESS GRPC REALITY"],
@@ -216,7 +216,7 @@ async def check_pending_orders():
                 orders = response.json()
                 for order in orders:
                     created_time = datetime.fromisoformat(order["created_at"])
-                    if datetime.now() - created_time > datetime.timedelta(minutes=30):
+                    if datetime.now() - created_time > timedelta(minutes=30):
                         update_order_status(order["order_id"], "rejected")
                         await bot.send_message(
                             order["telegram_id"],
