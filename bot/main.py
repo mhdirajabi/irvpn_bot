@@ -1,8 +1,8 @@
-import asyncio
-from datetime import datetime, timedelta
 import uuid
-import requests
+from datetime import datetime, timedelta
 
+import asyncio
+import requests
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -18,6 +18,7 @@ from config import (
 )
 from utils.marzban import API_TOKEN
 from utils.plans import PLANS
+from utils.logger import logger
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -73,8 +74,12 @@ def save_order(
     order_id: str,
     plan_id: str,
     plan_type: str,
+    price: int,
     is_renewal: bool = False,
 ):
+    logger.debug(
+        f"Saving order: telegram_id={telegram_id}, order_id={order_id}, plan_id={plan_type}:{plan_id}"
+    )
     try:
         response = requests.post(
             f"{DJANGO_API_URL}/orders",
@@ -84,14 +89,16 @@ def save_order(
                 "plan_id": f"{plan_type}:{plan_id}",
                 "status": "pending",
                 "created_at": datetime.now().isoformat(),
+                "price": price,
                 "is_renewal": is_renewal,
             },
-            timeout=2000,
+            timeout=5,
         )
-        if response.status_code != 200:
-            print(f"Error syncing order with Django: {response.text}")
-    except Exception as e:
-        print(f"Error syncing order with Django: {e}")
+        response.raise_for_status()
+        logger.info(f"Order saved successfully: {order_id}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error syncing order with Django: {e}")
+        raise Exception(f"Failed to save order: {e}") from e
 
 
 def update_order_status(
@@ -643,39 +650,46 @@ async def process_renew_plan_selection(callback: types.CallbackQuery):
 @dp.message(F.photo)
 async def handle_receipt(message: types.Message):
     user_id = message.from_user.id
+    logger.debug(f"Handling receipt for user: {user_id}")
     if not await check_channel_membership(user_id):
+        logger.warning(f"User {user_id} not in channel {CHANNEL_ID}")
         await message.reply(f"لطفاً ابتدا در کانال ما عضو شوید: {CHANNEL_ID}")
         return
 
     try:
         response = requests.get(
-            f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending",
-            timeout=2000,
+            f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending", timeout=5
         )
-        if response.status_code == 200:
-            orders = response.json()
-            if not orders:
-                await message.reply("هیچ سفارش در حال انتظاری برای شما وجود ندارد!")
-                return
-            order = orders[0]
-            order_id, plan_id, is_renewal = (
-                order["order_id"],
-                order["plan_id"],
-                order.get("is_renewal", False),
-            )
-            plan_type, plan_id = (
-                plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
-            )
-        else:
-            await message.reply("خطا در بررسی سفارش!")
+        response.raise_for_status()
+        orders = response.json()
+        logger.info(f"Orders fetched for user {user_id}: {orders}")
+        if not orders:
+            logger.warning(f"No pending orders found for user {user_id}")
+            await message.reply("هیچ سفارش در حال انتظاری برای شما وجود ندارد!")
             return
-    except Exception as e:
-        await message.reply(f"خطا: {str(e)}")
+        order = orders[0]
+        order_id, plan_id, is_renewal = (
+            order["order_id"],
+            order["plan_id"],
+            order.get("is_renewal", False),
+        )
+        plan_type, plan_id = (
+            plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error checking order for user {user_id}: {e}")
+        await message.reply(f"خطا در ارتباط با سرور: {str(e)}")
         return
 
     plan = PLANS.get(plan_type, {}).get(plan_id)
+    if not plan:
+        logger.error(f"Invalid plan: {plan_type}:{plan_id}")
+        await message.reply("پلن نامعتبر است!")
+        return
+
     receipt_url = await upload_receipt(message.photo[-1].file_id, order_id)
     if not receipt_url:
+        logger.error(f"Failed to upload receipt for order {order_id}")
         await message.reply("خطا در آپلود رسید!")
         return
 
@@ -699,6 +713,7 @@ async def handle_receipt(message: types.Message):
         ),
         reply_markup=keyboard,
     )
+    logger.info(f"Receipt sent to admin for order {order_id}")
     update_order_status(order_id, "pending", receipt_url, receipt_message.message_id)
     await message.reply("رسید شما برای ادمین ارسال شد. منتظر تأیید باشید.")
 
