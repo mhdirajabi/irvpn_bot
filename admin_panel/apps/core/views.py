@@ -66,17 +66,20 @@ class OrderListCreateView(APIView):
         queryset = Order.objects.all()
         if telegram_id:
             try:
-                queryset = queryset.filter(telegram_id=int(telegram_id))
+                telegram_id = int(telegram_id)  # تبدیل به عدد
+                queryset = queryset.filter(telegram_id=telegram_id)
             except ValueError:
                 logger.error(f"Invalid telegram_id: {telegram_id}")
                 return Response(
                     {"error": "Invalid telegram_id"}, status=status.HTTP_400_BAD_REQUEST
                 )
         if status_param:
+            status_param = status_param.strip()  # حذف whitespace
             queryset = queryset.filter(status=status_param)
 
+        logger.info(f"Queryset after filtering: {list(queryset.values())}")
         serializer = OrderSerializer(queryset, many=True)
-        logger.info(f"Returning {queryset.count()} orders: {list(queryset.values())}")
+        logger.info(f"Returning {queryset.count()} orders: {serializer.data}")
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):

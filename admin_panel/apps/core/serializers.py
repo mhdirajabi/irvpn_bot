@@ -40,7 +40,9 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         logger.debug(f"Validating order data: {data}")
-        # اطمینان از درست بودن فرمت created_at
+        if not isinstance(data.get("telegram_id"), int):
+            logger.error(f"Invalid telegram_id type: {type(data.get('telegram_id'))}")
+            raise serializers.ValidationError("telegram_id must be an integer")
         if isinstance(data.get("created_at"), str):
             from datetime import datetime
 
@@ -51,4 +53,3 @@ class OrderSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Invalid created_at format"
                 ) from ValueError
-        return data
