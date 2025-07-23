@@ -657,9 +657,9 @@ async def handle_receipt(message: types.Message):
         return
 
     try:
-        response = requests.get(
-            f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending", timeout=5
-        )
+        url = f"{DJANGO_API_URL}/orders/?telegram_id={user_id}&status=pending"
+        logger.debug(f"Sending GET request to: {url}")
+        response = requests.get(url, timeout=5, verify=True)
         response.raise_for_status()
         orders = response.json()
         logger.info(f"Orders fetched for user {user_id}: {orders}")
@@ -676,8 +676,13 @@ async def handle_receipt(message: types.Message):
         plan_type, plan_id = (
             plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
         )
+        logger.debug(
+            f"Processing order: {order_id}, plan_id: {plan_id}, is_renewal: {is_renewal}"
+        )
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error checking order for user {user_id}: {e}")
+        logger.error(
+            f"Error checking order for user {user_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
+        )
         await message.reply(f"خطا در ارتباط با سرور: {str(e)}")
         return
 
