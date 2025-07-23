@@ -77,27 +77,28 @@ def save_order(
     price: int,
     is_renewal: bool = False,
 ):
-    logger.debug(
-        f"Saving order: telegram_id={telegram_id}, order_id={order_id}, plan_id={plan_type}:{plan_id}"
-    )
+    data = {
+        "telegram_id": telegram_id,
+        "order_id": order_id,
+        "plan_id": f"{plan_type}:{plan_id}",
+        "status": "pending",
+        "created_at": datetime.now().isoformat(),
+        "price": price,
+        "is_renewal": is_renewal,
+    }
+    logger.debug(f"Sending order to Django: {data}")
     try:
         response = requests.post(
-            f"{DJANGO_API_URL}/orders",
-            json={
-                "telegram_id": telegram_id,
-                "order_id": order_id,
-                "plan_id": f"{plan_type}:{plan_id}",
-                "status": "pending",
-                "created_at": datetime.now().isoformat(),
-                "price": price,
-                "is_renewal": is_renewal,
-            },
-            timeout=5,
-        )
+            f"{DJANGO_API_URL}/orders/", json=data, timeout=5
+        )  # اضافه کردن "/" به انتهای URL
         response.raise_for_status()
-        logger.info(f"Order saved successfully: {order_id}")
+        logger.info(
+            f"Order saved successfully: {order_id}, response: {response.json()}"
+        )
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error syncing order with Django: {e}")
+        logger.error(
+            f"Error syncing order with Django: {e}, response: {response.text if 'response' in locals() else 'No response'}"
+        )
         raise Exception(f"Failed to save order: {e}") from e
 
 

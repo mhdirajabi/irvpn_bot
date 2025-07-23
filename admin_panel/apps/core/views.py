@@ -1,12 +1,15 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.db.models import Count, Sum
+from django.db.models import Sum
 from .models import User, Order
 from .serializers import UserSerializer, OrderSerializer
 from django.core.files.storage import FileSystemStorage
 import requests
 from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger("core")
 
 
 class UserListCreateView(APIView):
@@ -45,20 +48,34 @@ class OrderListCreateView(APIView):
     def get(self, request):
         telegram_id = request.query_params.get("telegram_id")
         status_param = request.query_params.get("status")
-        if telegram_id and status_param:
-            orders = Order.objects.filter(telegram_id=telegram_id, status=status_param)
-        elif telegram_id:
-            orders = Order.objects.filter(telegram_id=telegram_id)
-        else:
-            orders = Order.objects.all()
-        serializer = OrderSerializer(orders, many=True)
-        return Response(serializer.data)
+        logger.debug(
+            f"Fetching orders with telegram_id={telegram_id}, status={status_param}"
+        )
+
+        queryset = Order.objects.all()
+        if telegram_id:
+            try:
+                queryset = queryset.filter(telegram_id=int(telegram_id))
+            except ValueError:
+                logger.error(f"Invalid telegram_id: {telegram_id}")
+                return Response(
+                    {"error": "Invalid telegram_id"}, status=status.HTTP_400_BAD_REQUEST
+                )
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+
+        serializer = OrderSerializer(queryset, many=True)
+        logger.info(f"Returning {queryset.count()} orders: {list(queryset.values())}")
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
+        logger.debug(f"Creating order with data: {request.data}")
         serializer = OrderSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
+            logger.info(f"Order created: {serializer.data}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        logger.error(f"Order creation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

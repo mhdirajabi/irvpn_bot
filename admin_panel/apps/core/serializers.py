@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from .models import User, Order
+import logging
+
+logger = logging.getLogger("core")
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -12,13 +15,29 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
+            "id",
             "telegram_id",
             "order_id",
             "plan_id",
             "status",
             "created_at",
+            "price",
+            "is_renewal",
             "receipt_url",
             "receipt_message_id",
-            "is_renewal",
-            "price",
         ]
+
+    def validate(self, data):
+        logger.debug(f"Validating order data: {data}")
+        # اطمینان از درست بودن فرمت created_at
+        if isinstance(data.get("created_at"), str):
+            from datetime import datetime
+
+            try:
+                datetime.fromisoformat(data["created_at"].replace("Z", "+00:00"))
+            except ValueError:
+                logger.error(f"Invalid created_at format: {data['created_at']}")
+                raise serializers.ValidationError(
+                    "Invalid created_at format"
+                ) from ValueError
+        return data
