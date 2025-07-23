@@ -120,21 +120,24 @@ def update_order_status(
         print(f"Error syncing order status with Django: {e}")
 
 
-async def upload_receipt(file_id: str, order_id: str):
+async def upload_receipt(file_id: str, order_id: str, bot: Bot):
+    logger.debug(f"Uploading receipt for order {order_id}, file_id: {file_id}")
     try:
-        file_info = await bot.get_file(file_id)
-        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_info.file_path}"
+        file = await bot.get_file(file_id)
+        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+        data = {"order_id": order_id, "file_url": file_url}
+        logger.debug(f"Sending receipt to Django: {data}")
         response = requests.post(
-            f"{DJANGO_API_URL}/receipts",
-            json={"order_id": order_id, "file_url": file_url},
-            timeout=10000,
+            f"{DJANGO_API_URL}/receipts/", json=data, timeout=5, verify=True
         )
-        if response.status_code == 200:
-            return response.json().get("receipt_url")
-        return None
-    except Exception as e:
-        print(f"Error uploading receipt: {e}")
-        return None
+        response.raise_for_status()
+        logger.info(f"Receipt uploaded for order {order_id}: {response.json()}")
+        return response.json().get("file_url")
+    except requests.exceptions.RequestException as e:
+        logger.error(
+            f"Failed to upload receipt for order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
+        )
+        raise Exception(f"Failed to upload receipt: {e}") from e
 
 
 def get_subscription_info(token: str):
@@ -648,7 +651,7 @@ async def process_renew_plan_selection(callback: types.CallbackQuery):
 
 
 @dp.message(F.photo)
-async def handle_receipt(message: types.Message):
+async def handle_receipt(message: types.Message, bot: Bot):
     user_id = message.from_user.id
     logger.debug(f"Handling receipt for user: {user_id}")
     if not await check_channel_membership(user_id):
@@ -667,7 +670,9 @@ async def handle_receipt(message: types.Message):
             logger.warning(f"No pending orders found for user {user_id}")
             await message.reply("هیچ سفارش در حال انتظاری برای شما وجود ندارد!")
             return
-        order = orders[0]
+        order = sorted(orders, key=lambda x: x["created_at"], reverse=True)[
+            0
+        ]  # جدیدترین سفارش
         order_id, plan_id, is_renewal = (
             order["order_id"],
             order["plan_id"],
@@ -692,9 +697,14 @@ async def handle_receipt(message: types.Message):
         await message.reply("پلن نامعتبر است!")
         return
 
-    receipt_url = await upload_receipt(message.photo[-1].file_id, order_id)
-    if not receipt_url:
-        logger.error(f"Failed to upload receipt for order {order_id}")
+    try:
+        receipt_url = await upload_receipt(message.photo[-1].file_id, order_id, bot)
+        if not receipt_url:
+            logger.error(f"Failed to upload receipt for order {order_id}")
+            await message.reply("خطا در آپلود رسید!")
+            return
+    except Exception as e:
+        logger.error(f"Failed to upload receipt for order {order_id}: {e}")
         await message.reply("خطا در آپلود رسید!")
         return
 
@@ -718,7 +728,9 @@ async def handle_receipt(message: types.Message):
         ),
         reply_markup=keyboard,
     )
-    logger.info(f"Receipt sent to admin for order {order_id}")
+    logger.info(
+        f"Receipt sent to admin for order {order_id}, message_id: {receipt_message.message_id}"
+    )
     update_order_status(order_id, "pending", receipt_url, receipt_message.message_id)
     await message.reply("رسید شما برای ادمین ارسال شد. منتظر تأیید باشید.")
 

@@ -10,6 +10,8 @@ services:
     volumes:
       - ./bot:/app
       - media:/app/media
+    networks:
+      - app-network
     depends_on:
       - db
     restart: always
@@ -24,6 +26,8 @@ services:
       - ./admin_panel:/app
       - media:/app/media
       - static:/app/static
+    networks:
+      - app-network
     depends_on:
       - db
     restart: always
@@ -34,6 +38,8 @@ services:
       - .env
     volumes:
       - db_data:/var/lib/postgresql/data
+    networks:
+      - app-network
     restart: always
 
   nginx:
@@ -46,9 +52,15 @@ services:
       - static:/usr/share/nginx/html/static
       - media:/usr/share/nginx/html/media
       - ./nginx/certs:/etc/nginx/certs
+    networks:
+      - app-network
     depends_on:
       - admin
     restart: always
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   db_data:

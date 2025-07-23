@@ -53,3 +53,4 @@ class OrderSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Invalid created_at format"
                 ) from ValueError
+        return data

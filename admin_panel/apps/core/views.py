@@ -1,8 +1,6 @@
 import logging
 from datetime import datetime, timedelta
 
-import requests
-from django.core.files.storage import FileSystemStorage
 from django.db.models import Sum
 from rest_framework import status
 from rest_framework.response import Response
@@ -66,7 +64,7 @@ class OrderListCreateView(APIView):
         queryset = Order.objects.all()
         if telegram_id:
             try:
-                telegram_id = int(telegram_id)  # تبدیل به عدد
+                telegram_id = int(telegram_id)
                 queryset = queryset.filter(telegram_id=telegram_id)
             except ValueError:
                 logger.error(f"Invalid telegram_id: {telegram_id}")
@@ -74,7 +72,7 @@ class OrderListCreateView(APIView):
                     {"error": "Invalid telegram_id"}, status=status.HTTP_400_BAD_REQUEST
                 )
         if status_param:
-            status_param = status_param.strip()  # حذف whitespace
+            status_param = status_param.strip()
             queryset = queryset.filter(status=status_param)
 
         logger.info(f"Queryset after filtering: {list(queryset.values())}")
@@ -111,26 +109,33 @@ class OrderUpdateView(APIView):
 
 class ReceiptUploadView(APIView):
     def post(self, request):
+        logger.debug(f"Uploading receipt with data: {request.data}")
         order_id = request.data.get("order_id")
         file_url = request.data.get("file_url")
+
+        if not order_id or not file_url:
+            logger.error(f"Missing order_id or file_url: {request.data}")
+            return Response(
+                {"error": "order_id and file_url are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             order = Order.objects.get(order_id=order_id)
-            response = requests.get(file_url, timeout=50000)
-            if response.status_code == 200:
-                fs = FileSystemStorage()
-                filename = f"receipts/{order_id}.jpg"
-                with open(fs.path(filename), "wb") as f:
-                    f.write(response.content)
-                receipt_url = fs.url(filename)
-                order.receipt_url = receipt_url
-                order.save()
-                return Response({"receipt_url": receipt_url}, status=status.HTTP_200_OK)
-            return Response(
-                {"error": "Failed to download file"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            order.receipt_url = file_url
+            order.save()
+            logger.info(f"Receipt URL updated for order {order_id}: {file_url}")
+            return Response({"file_url": file_url}, status=status.HTTP_200_OK)
         except Order.DoesNotExist:
+            logger.error(f"Order not found: {order_id}")
             return Response(
-                {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": f"Order with order_id {order_id} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            logger.error(f"Error updating receipt for order {order_id}: {str(e)}")
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
