@@ -670,9 +670,7 @@ async def handle_receipt(message: types.Message, bot: Bot):
             logger.warning(f"No pending orders found for user {user_id}")
             await message.reply("هیچ سفارش در حال انتظاری برای شما وجود ندارد!")
             return
-        order = sorted(orders, key=lambda x: x["created_at"], reverse=True)[
-            0
-        ]  # جدیدترین سفارش
+        order = sorted(orders, key=lambda x: x["created_at"], reverse=True)[0]
         order_id, plan_id, is_renewal = (
             order["order_id"],
             order["plan_id"],
@@ -731,106 +729,160 @@ async def handle_receipt(message: types.Message, bot: Bot):
     logger.info(
         f"Receipt sent to admin for order {order_id}, message_id: {receipt_message.message_id}"
     )
-    update_order_status(order_id, "pending", receipt_url, receipt_message.message_id)
+
+    # ذخیره receipt_message_id
+    try:
+        response = requests.post(
+            f"{DJANGO_API_URL}/receipts/",
+            json={
+                "order_id": order_id,
+                "file_url": receipt_url,
+                "receipt_message_id": receipt_message.message_id,
+            },
+            timeout=5,
+            verify=True,
+        )
+        response.raise_for_status()
+        logger.info(
+            f"Receipt message ID updated for order {order_id}: {receipt_message.message_id}"
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to update receipt_message_id for order {order_id}: {e}")
+
     await message.reply("رسید شما برای ادمین ارسال شد. منتظر تأیید باشید.")
 
 
 @dp.callback_query(lambda c: c.data.startswith(("confirm_", "reject_")))
-async def process_order_action(callback: types.CallbackQuery):
+async def process_order_action(callback: types.CallbackQuery, bot: Bot):
     if not await is_admin(callback.from_user.id):
-        await callback.message.reply("فقط ادمین می‌تواند این عملیات را انجام دهد!")
+        await callback.answer("فقط ادمین می‌تواند این عملیات را انجام دهد!")
         return
 
     action, order_id = callback.data.split("_", 1)
+    logger.debug(f"Processing {action} for order {order_id}")
+
     try:
-        response = requests.get(f"{DJANGO_API_URL}/orders/{order_id}", timeout=2000)
-        if response.status_code == 200:
-            order = response.json()
-            telegram_id, plan_id, is_renewal = (
-                order["telegram_id"],
-                order["plan_id"],
-                order.get("is_renewal", False),
-            )
-            plan_type, plan_id = (
-                plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
-            )
-        else:
-            await callback.message.reply("سفارش یافت نشد!")
-            return
-    except Exception as e:
-        await callback.message.reply(f"خطا: {str(e)}")
+        # دریافت اطلاعات سفارش
+        response = requests.get(f"{DJANGO_API_URL}/orders/{order_id}/", timeout=5)
+        response.raise_for_status()
+        order = response.json()
+        telegram_id, plan_id, is_renewal = (
+            order["telegram_id"],
+            order["plan_id"],
+            order.get("is_renewal", False),
+        )
+        plan_type, plan_id = (
+            plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
+        )
+        logger.info(f"Order {order_id} fetched: {order}")
+    except requests.exceptions.RequestException as e:
+        logger.error(
+            f"Failed to fetch order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
+        )
+        await callback.answer("سفارش یافت نشد!")
         return
 
     plan = PLANS.get(plan_type, {}).get(plan_id)
+    if not plan:
+        logger.error(f"Invalid plan: {plan_type}:{plan_id}")
+        await callback.answer("پلن نامعتبر است!")
+        return
 
     if action == "confirm":
-        token, username = get_user_data(telegram_id)
-        if is_renewal and username:
-            user_info = renew_user(
-                username, plan["data_limit"], plan["expire_days"], plan["users"]
-            )
-            if user_info:
-                save_user_token(
-                    telegram_id, user_info["subscription_url"].split("/")[-2], username
+        try:
+            token, username = get_user_data(telegram_id)
+            if is_renewal and username:
+                user_info = renew_user(
+                    username, plan["data_limit"], plan["expire_days"], plan["users"]
                 )
-                update_order_status(
-                    order_id,
-                    "confirmed",
-                    order.get("receipt_url"),
-                    order.get("receipt_message_id"),
-                )
-                await bot.send_message(
-                    telegram_id,
-                    f"تمدید اکانت شما تأیید شد!\n"
-                    f"نام کاربری: {username}\n"
-                    f"حجم: {plan['data_limit'] / 1073741824 if plan['data_limit'] else 'نامحدود'} گیگابایت\n"
-                    f"مدت: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
-                    f"لینک اشتراک: {user_info['subscription_url']}\n"
-                    f"لطفاً این لینک را ذخیره کنید یا از /getlink برای دریافت مجدد استفاده کنید.",
-                )
-                await callback.message.reply("تمدید اکانت تأیید شد.")
+                if user_info:
+                    save_user_token(
+                        telegram_id,
+                        user_info["subscription_url"].split("/")[-2],
+                        username,
+                    )
+                    # آپدیت وضعیت سفارش
+                    response = requests.put(
+                        f"{DJANGO_API_URL}/orders/{order_id}/",
+                        json={"status": "confirmed", "telegram_id": telegram_id},
+                        timeout=5,
+                    )
+                    response.raise_for_status()
+                    logger.info(f"Order {order_id} confirmed")
+                    await bot.send_message(
+                        telegram_id,
+                        f"تمدید اکانت شما تأیید شد!\n"
+                        f"نام کاربری: {username}\n"
+                        f"حجم: {plan['data_limit'] / 1073741824 if plan['data_limit'] else 'نامحدود'} گیگابایت\n"
+                        f"مدت: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
+                        f"لینک اشتراک: {user_info['subscription_url']}\n"
+                        f"لطفاً این لینک را ذخیره کنید یا از /getlink برای دریافت مجدد استفاده کنید.",
+                    )
+                    await callback.message.edit_caption(
+                        caption=callback.message.caption + "\n\nوضعیت: تأیید شده"
+                    )
+                    await callback.answer("تمدید اکانت تأیید شد.")
+                else:
+                    logger.error(f"Failed to renew user for order {order_id}")
+                    await callback.answer("خطا در تمدید اکانت!")
             else:
-                await callback.message.reply("خطا در تمدید اکانت!")
-        else:
-            username = f"user_{uuid.uuid4().hex[:8]}"
-            user_info = create_user(
-                username, plan["data_limit"], plan["expire_days"], plan["users"]
+                username = f"user_{uuid.uuid4().hex[:8]}"
+                user_info = create_user(
+                    username, plan["data_limit"], plan["expire_days"], plan["users"]
+                )
+                if user_info:
+                    token = user_info["subscription_url"].split("/")[-2]
+                    save_user_token(telegram_id, token, username)
+                    response = requests.put(
+                        f"{DJANGO_API_URL}/orders/{order_id}/",
+                        json={"status": "confirmed", "telegram_id": telegram_id},
+                        timeout=5,
+                    )
+                    response.raise_for_status()
+                    logger.info(f"Order {order_id} confirmed")
+                    await bot.send_message(
+                        telegram_id,
+                        f"سفارش شما تأیید شد!\n"
+                        f"نام کاربری: {username}\n"
+                        f"حجم: {plan['data_limit'] / 1073741824 if plan['data_limit'] else 'نامحدود'} گیگابایت\n"
+                        f"مدت: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
+                        f"لینک اشتراک: {user_info['subscription_url']}\n"
+                        f"لطفاً این لینک را ذخیره کنید یا از /getlink برای دریافت مجدد استفاده کنید.",
+                    )
+                    await callback.message.edit_caption(
+                        caption=callback.message.caption + "\n\nوضعیت: تأیید شده"
+                    )
+                    await callback.answer("سفارش تأیید شد و اکانت برای کاربر ایجاد شد.")
+                else:
+                    logger.error(f"Failed to create user for order {order_id}")
+                    await callback.answer("خطا در ایجاد اکانت!")
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                f"Failed to confirm order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
             )
-            if user_info:
-                token = user_info["subscription_url"].split("/")[-2]
-                save_user_token(telegram_id, token, username)
-                update_order_status(
-                    order_id,
-                    "confirmed",
-                    order.get("receipt_url"),
-                    order.get("receipt_message_id"),
-                )
-                await bot.send_message(
-                    telegram_id,
-                    f"سفارش شما تأیید شد!\n"
-                    f"نام کاربری: {username}\n"
-                    f"حجم: {plan['data_limit'] / 1073741824 if plan['data_limit'] else 'نامحدود'} گیگابایت\n"
-                    f"مدت: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
-                    f"لینک اشتراک: {user_info['subscription_url']}\n"
-                    f"لطفاً این لینک را ذخیره کنید یا از /getlink برای دریافت مجدد استفاده کنید.",
-                )
-                await callback.message.reply(
-                    "سفارش تأیید شد و اکانت برای کاربر ایجاد شد."
-                )
-            else:
-                await callback.message.reply("خطا در ایجاد اکانت!")
+            await callback.answer("خطا در تأیید سفارش!")
     else:
-        update_order_status(
-            order_id,
-            "rejected",
-            order.get("receipt_url"),
-            order.get("receipt_message_id"),
-        )
-        await bot.send_message(
-            telegram_id,
-            f"{'تمدید' if is_renewal else 'سفارش'} {order_id} توسط ادمین رد شد.",
-        )
-        await callback.message.reply("سفارش رد شد.")
+        try:
+            response = requests.put(
+                f"{DJANGO_API_URL}/orders/{order_id}/",
+                json={"status": "rejected", "telegram_id": telegram_id},
+                timeout=5,
+            )
+            response.raise_for_status()
+            logger.info(f"Order {order_id} rejected")
+            await bot.send_message(
+                telegram_id,
+                f"{'تمدید' if is_renewal else 'سفارش'} {order_id} توسط ادمین رد شد.",
+            )
+            await callback.message.edit_caption(
+                caption=callback.message.caption + "\n\nوضعیت: رد شده"
+            )
+            await callback.answer("سفارش رد شد.")
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                f"Failed to reject order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
+            )
+            await callback.answer("خطا در رد سفارش!")
 
     await callback.answer()
 

@@ -92,19 +92,55 @@ class OrderListCreateView(APIView):
 
 
 class OrderUpdateView(APIView):
-    def put(self, request, order_id):
+    def get(self, request, order_id):
+        logger.debug(f"Fetching order {order_id}")
         try:
             order = Order.objects.get(order_id=order_id)
+            serializer = OrderSerializer(order)
+            logger.info(f"Order {order_id} fetched: {serializer.data}")
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Order.DoesNotExist:
+            logger.error(f"Order not found: {order_id}")
             return Response(
-                {"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": f"Order with order_id {order_id} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            logger.error(f"Error fetching order {order_id}: {str(e)}")
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        serializer = OrderSerializer(order, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def put(self, request, order_id):
+        logger.debug(f"Updating order {order_id} with data: {request.data}")
+        try:
+            order = Order.objects.get(order_id=order_id)
+            status_param = request.data.get("status")
+            if status_param not in ["confirmed", "rejected"]:
+                logger.error(f"Invalid status: {status_param}")
+                return Response(
+                    {"error": "Status must be 'confirmed' or 'rejected'"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            order.status = status_param
+            order.save()
+            logger.info(f"Order {order_id} updated to status: {status_param}")
+            return Response(
+                {"order_id": order_id, "status": status_param},
+                status=status.HTTP_200_OK,
+            )
+        except Order.DoesNotExist:
+            logger.error(f"Order not found: {order_id}")
+            return Response(
+                {"error": f"Order with order_id {order_id} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            logger.error(f"Error updating order {order_id}: {str(e)}")
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class ReceiptUploadView(APIView):
