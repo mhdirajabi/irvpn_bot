@@ -38,7 +38,7 @@ async def is_admin(user_id: int) -> bool:
 def save_user_token(telegram_id: int, token: str, username: str):
     try:
         response = requests.post(
-            f"{DJANGO_API_URL}/users/",
+            f"{DJANGO_API_URL}/users",
             json={
                 "telegram_id": telegram_id,
                 "subscription_token": token,
@@ -55,7 +55,7 @@ def save_user_token(telegram_id: int, token: str, username: str):
 def get_user_data(telegram_id: int) -> tuple:
     try:
         response = requests.get(
-            f"{DJANGO_API_URL}/users?telegram_id={telegram_id}/",
+            f"{DJANGO_API_URL}/users?telegram_id={telegram_id}",
             timeout=2000,
         )
         if response.status_code == 200:
@@ -88,7 +88,7 @@ def save_order(
     logger.debug(f"Sending order to Django: {data}")
     try:
         response = requests.post(
-            f"{DJANGO_API_URL}/orders/", json=data, timeout=5
+            f"{DJANGO_API_URL}/orders", json=data, timeout=5
         )  # اضافه کردن "/" به انتهای URL
         response.raise_for_status()
         logger.info(
@@ -106,7 +106,7 @@ def update_order_status(
 ):
     try:
         response = requests.put(
-            f"{DJANGO_API_URL}/orders/{order_id}/",
+            f"{DJANGO_API_URL}/orders/{order_id}",
             json={
                 "status": status,
                 "receipt_url": receipt_url,
@@ -125,7 +125,7 @@ async def upload_receipt(file_id: str, order_id: str):
         file_info = await bot.get_file(file_id)
         file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_info.file_path}"
         response = requests.post(
-            f"{DJANGO_API_URL}/receipts/",
+            f"{DJANGO_API_URL}/receipts",
             json={"order_id": order_id, "file_url": file_url},
             timeout=10000,
         )
@@ -216,7 +216,7 @@ async def check_pending_orders():
     while True:
         try:
             response = requests.get(
-                f"{DJANGO_API_URL}/orders?status=pending/",
+                f"{DJANGO_API_URL}/orders?status=pending",
                 timeout=2000,
             )
             if response.status_code == 200:
@@ -238,7 +238,7 @@ async def check_expiring_users():
     while True:
         try:
             response = requests.get(
-                f"{DJANGO_API_URL}/users/",
+                f"{DJANGO_API_URL}/users",
                 timeout=2000,
             )
             if response.status_code == 200:
@@ -658,7 +658,7 @@ async def handle_receipt(message: types.Message):
 
     try:
         response = requests.get(
-            f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending/", timeout=5
+            f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending", timeout=5
         )
         response.raise_for_status()
         orders = response.json()
@@ -726,7 +726,7 @@ async def process_order_action(callback: types.CallbackQuery):
 
     action, order_id = callback.data.split("_", 1)
     try:
-        response = requests.get(f"{DJANGO_API_URL}/orders/{order_id}/", timeout=2000)
+        response = requests.get(f"{DJANGO_API_URL}/orders/{order_id}", timeout=2000)
         if response.status_code == 200:
             order = response.json()
             telegram_id, plan_id, is_renewal = (
