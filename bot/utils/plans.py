@@ -1,48 +1,48 @@
 PLANS = {
     "volume": {
-        "v1m_20gb": {
+        "v1m20gb": {
             "data_limit": 20 * 1073741824,
             "expire_days": 30,
             "price": 130000,
             "users": "unlimited",
         },
-        "v1m_30gb": {
+        "v1m30gb": {
             "data_limit": 30 * 1073741824,
             "expire_days": 30,
             "price": 180000,
             "users": "unlimited",
         },
-        "v1m_60gb": {
+        "v1m60gb": {
             "data_limit": 60 * 1073741824,
             "expire_days": 30,
             "price": 310000,
             "users": "unlimited",
         },
-        "v3m_80gb": {
+        "v3m80gb": {
             "data_limit": 80 * 1073741824,
             "expire_days": 90,
             "price": 380000,
             "users": "unlimited",
         },
-        "v3m_120gb": {
+        "v3m120gb": {
             "data_limit": 120 * 1073741824,
             "expire_days": 90,
             "price": 480000,
             "users": "unlimited",
         },
-        "v3m_180gb": {
+        "v3m180gb": {
             "data_limit": 180 * 1073741824,
             "expire_days": 90,
             "price": 560000,
             "users": "unlimited",
         },
-        "vlifetime_100gb": {
+        "vlifetime100gb": {
             "data_limit": 100 * 1073741824,
             "expire_days": 0,
             "price": 550000,
             "users": "unlimited",
         },
-        "vlifetime_200gb": {
+        "vlifetime200gb": {
             "data_limit": 200 * 1073741824,
             "expire_days": 0,
             "price": 980000,
@@ -50,19 +50,19 @@ PLANS = {
         },
     },
     "unlimited": {
-        "u1m_1user": {
+        "u1m1user": {
             "data_limit": 0,
             "expire_days": 30,
             "price": 160000,
             "users": "single",
         },
-        "u1m_2users": {
+        "u1m2users": {
             "data_limit": 0,
             "expire_days": 30,
             "price": 199000,
             "users": "double",
         },
-        "u3m_2users": {
+        "u3m2users": {
             "data_limit": 0,
             "expire_days": 90,
             "price": 590000,
@@ -70,7 +70,7 @@ PLANS = {
         },
     },
     "test": {
-        "test_1gb": {
+        "test1gb": {
             "data_limit": 1 * 1073741824,
             "expire_days": 1,
             "price": 0,
