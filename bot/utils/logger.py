@@ -1,6 +1,5 @@
 import logging
 
-
 logger = logging.getLogger("vpn_bot")
 logger.setLevel(logging.DEBUG)
 

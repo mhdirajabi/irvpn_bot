@@ -1,6 +1,8 @@
-from rest_framework import serializers
-from .models import User, Order
 import logging
+
+from rest_framework import serializers
+
+from .models import Order, User
 
 logger = logging.getLogger("core")
 
