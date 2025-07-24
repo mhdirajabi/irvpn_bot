@@ -167,18 +167,13 @@ def create_user(username: str, data_limit: int, expire_days: int, users: str):
         if expire_days == 0
         else int((datetime.now() + timedelta(days=expire_days)).timestamp())
     )
-    inbounds = {
-        "vless": ["VLESS TCP REALITY", "VLESS GRPC REALITY"],
-        "vmess": ["VMess TCP", "VMess Websocket"],
-    }
-    if users == "single":
-        inbounds = {"vless": ["VLESS TCP REALITY"]}
-    elif users == "double":
-        inbounds = {"vless": ["VLESS TCP REALITY"], "vmess": ["VMess TCP"]}
+    inbounds = {"vless": ["IR_SV"]}
+    if users == "double":
+        inbounds = {"vless": ["IR_SV", "SERVER-KHAREJ"]}
 
     payload = {
         "username": username,
-        "proxies": {"vless": {}, "vmess": {}},
+        "proxies": {"vless": {}},
         "inbounds": inbounds,
         "data_limit": data_limit if data_limit else None,
         "expire": expire_timestamp,
@@ -192,6 +187,7 @@ def create_user(username: str, data_limit: int, expire_days: int, users: str):
             json=payload,
             headers=headers,
             timeout=5,
+            verify=True,
         )
         response.raise_for_status()
         user_info = response.json()
@@ -217,14 +213,9 @@ def renew_user(username: str, data_limit: int, expire_days: int, users: str):
         if expire_days == 0
         else int((datetime.now() + timedelta(days=expire_days)).timestamp())
     )
-    inbounds = {
-        "vless": ["VLESS TCP REALITY", "VLESS GRPC REALITY"],
-        "vmess": ["VMess TCP", "VMess Websocket"],
-    }
-    if users == "single":
-        inbounds = {"vless": ["VLESS TCP REALITY"]}
-    elif users == "double":
-        inbounds = {"vless": ["VLESS TCP REALITY"], "vmess": ["VMess TCP"]}
+    inbounds = {"vless": ["IR_SV"]}
+    if users == "double":
+        inbounds = {"vless": ["IR_SV", "SERVER-KHAREJ"]}
 
     payload = {
         "data_limit": data_limit if data_limit else None,
@@ -240,6 +231,7 @@ def renew_user(username: str, data_limit: int, expire_days: int, users: str):
             json=payload,
             headers=headers,
             timeout=5,
+            verify=True,
         )
         response.raise_for_status()
         user_info = response.json()
