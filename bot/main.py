@@ -168,7 +168,7 @@ def create_user(username: str, data_limit: int, expire_days: int, users: str):
     if users == "single":
         inbounds = {"vless": ["VLESS TCP REALITY"]}
     elif users == "double":
-        inbounds = {"vless": ["VLESS TCP TEALITY"], "vmess": ["VMess TCP"]}
+        inbounds = {"vless": ["VLESS TCP REALITY"], "vmess": ["VMess TCP"]}
 
     payload = {
         "username": username,
