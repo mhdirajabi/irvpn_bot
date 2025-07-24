@@ -146,22 +146,21 @@ class OrderUpdateView(APIView):
 class ReceiptUploadView(APIView):
     def post(self, request):
         logger.debug(f"Uploading receipt with data: {request.data}")
+        serializer = OrderSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            logger.error(f"Invalid receipt data: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         order_id = request.data.get("order_id")
-        file_url = request.data.get("file_url")
-
-        if not order_id or not file_url:
-            logger.error(f"Missing order_id or file_url: {request.data}")
-            return Response(
-                {"error": "order_id and file_url are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         try:
             order = Order.objects.get(order_id=order_id)
-            order.receipt_url = file_url
-            order.save()
-            logger.info(f"Receipt URL updated for order {order_id}: {file_url}")
-            return Response({"file_url": file_url}, status=status.HTTP_200_OK)
+            serializer = OrderSerializer(order, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                logger.info(f"Receipt updated for order {order_id}: {serializer.data}")
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            logger.error(f"Invalid data for order {order_id}: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Order.DoesNotExist:
             logger.error(f"Order not found: {order_id}")
             return Response(
