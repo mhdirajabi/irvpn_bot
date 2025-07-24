@@ -423,7 +423,7 @@ async def getlink_command(message: types.Message):
     telegram_id = message.from_user.id
     try:
         response = requests.get(
-            f"{DJANGO_API_URL}/api/users/?telegram_id={telegram_id}",
+            f"{DJANGO_API_URL}/users/?telegram_id={telegram_id}",
             timeout=5,
             verify=True,
         )
