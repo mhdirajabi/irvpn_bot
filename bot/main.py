@@ -55,7 +55,7 @@ def save_user_token(telegram_id: int, token: str, username: str):
 def get_user_data(telegram_id: int) -> tuple:
     try:
         response = requests.get(
-            f"{DJANGO_API_URL}/users?telegram_id={telegram_id}/",
+            f"{DJANGO_API_URL}/users?telegram_id={telegram_id}",
             timeout=2000,
         )
         if response.status_code == 200:
@@ -250,7 +250,7 @@ async def check_pending_orders():
     while True:
         try:
             response = requests.get(
-                f"{DJANGO_API_URL}/orders?status=pending/",
+                f"{DJANGO_API_URL}/orders?status=pending",
                 timeout=2,
             )
             if response.status_code == 200:
@@ -691,7 +691,7 @@ async def handle_receipt(message: types.Message, bot: Bot):
         return
 
     try:
-        url = f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending/"
+        url = f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending"
         logger.debug(f"Sending GET request to: {url}")
         response = requests.get(url, timeout=5, verify=True)
         response.raise_for_status()
