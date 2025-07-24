@@ -21,7 +21,7 @@ class Order(models.Model):
     order_id = models.CharField(max_length=36, unique=True)
     plan_id = models.CharField(max_length=50)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    created_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
     receipt_url = models.URLField(blank=True, null=True)
     receipt_message_id = models.BigIntegerField(blank=True, null=True)
     is_renewal = models.BooleanField(default=False)

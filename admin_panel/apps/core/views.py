@@ -87,7 +87,7 @@ class OrderListCreateView(APIView):
             serializer.save()
             logger.info(f"Order created: {serializer.data}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        logger.error(f"Order creation failed: {serializer.errors}")
+        logger.error(f"Invalid order data: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

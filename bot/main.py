@@ -81,17 +81,23 @@ def save_order(
         "order_id": order_id,
         "plan_id": f"{plan_type}:{plan_id}",
         "status": "pending",
-        "created_at": datetime.now().isoformat(),
         "price": price,
         "is_renewal": is_renewal,
     }
     logger.debug(f"Sending order to Django: {data}")
     try:
-        response = requests.post(f"{DJANGO_API_URL}/orders/", json=data, timeout=5)
+        response = requests.post(
+            f"{DJANGO_API_URL}/orders/",
+            json=data,
+            headers={"Content-Type": "application/json"},
+            timeout=5,
+            verify=True,
+        )
         response.raise_for_status()
         logger.info(
             f"Order saved successfully: {order_id}, response: {response.json()}"
         )
+        return response.json()
     except requests.exceptions.RequestException as e:
         logger.error(
             f"Error syncing order with Django: {e}, response: {response.text if 'response' in locals() else 'No response'}"
