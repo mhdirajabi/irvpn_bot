@@ -766,6 +766,7 @@ async def handle_receipt(message: types.Message, bot: Bot):
                 "file_url": receipt_url,
                 "receipt_message_id": receipt_message.message_id,
                 "telegram_id": user_id,
+                "status": "pending",
             },
             headers={"Content-Type": "application/json"},
             timeout=5,
