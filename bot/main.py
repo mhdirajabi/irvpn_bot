@@ -124,24 +124,24 @@ def update_order_status(
         print(f"Error syncing order status with Django: {e}")
 
 
-async def upload_receipt(file_id: str, order_id: str, bot: Bot):
-    logger.debug(f"Uploading receipt for order {order_id}, file_id: {file_id}")
-    try:
-        file = await bot.get_file(file_id)
-        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-        data = {"order_id": order_id, "file_url": file_url}
-        logger.debug(f"Sending receipt to Django: {data}")
-        response = requests.post(
-            f"{DJANGO_API_URL}/receipts/", json=data, timeout=5, verify=True
-        )
-        response.raise_for_status()
-        logger.info(f"Receipt uploaded for order {order_id}: {response.json()}")
-        return response.json().get("file_url")
-    except requests.exceptions.RequestException as e:
-        logger.error(
-            f"Failed to upload receipt for order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
-        )
-        raise Exception(f"Failed to upload receipt: {e}") from e
+# async def upload_receipt(file_id: str, order_id: str, bot: Bot):
+#     logger.debug(f"Uploading receipt for order {order_id}, file_id: {file_id}")
+#     try:
+#         file = await bot.get_file(file_id)
+#         file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+#         data = {"order_id": order_id, "file_url": file_url}
+#         logger.debug(f"Sending receipt to Django: {data}")
+#         response = requests.post(
+#             f"{DJANGO_API_URL}/receipts/", json=data, timeout=5, verify=True
+#         )
+#         response.raise_for_status()
+#         logger.info(f"Receipt uploaded for order {order_id}: {response.json()}")
+#         return response.json().get("file_url")
+#     except requests.exceptions.RequestException as e:
+#         logger.error(
+#             f"Failed to upload receipt for order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
+#         )
+#         raise Exception(f"Failed to upload receipt: {e}") from e
 
 
 def get_subscription_info(token: str):
@@ -748,11 +748,11 @@ async def handle_receipt(message: types.Message, bot: Bot):
         return
 
     try:
-        file_id = message.photo[-1].file_id
-        receipt_url = await upload_receipt(file_id, order_id, bot)
+        file = await bot.get_file(message.photo[-1].file_id)
+        receipt_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
     except Exception as e:
-        logger.error(f"Failed to upload receipt for order {order_id}: {e}")
-        await message.reply("خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.")
+        logger.error(f"Failed to get file for order {order_id}: {e}")
+        await message.reply("خطا در دریافت فایل رسید!")
         return
 
     keyboard = InlineKeyboardMarkup(
@@ -784,6 +784,7 @@ async def handle_receipt(message: types.Message, bot: Bot):
             f"{DJANGO_API_URL}/orders/{order_id}/",
             json={
                 "order_id": order_id,
+                "receipt_url": receipt_url,
                 "receipt_message_id": receipt_message.message_id,
                 "telegram_id": user_id,
                 "status": "pending",
@@ -793,14 +794,12 @@ async def handle_receipt(message: types.Message, bot: Bot):
             verify=True,
         )
         response.raise_for_status()
-        logger.info(
-            f"Receipt message ID updated for order {order_id}: {response.json()}"
-        )
+        logger.info(f"Receipt updated for order {order_id}: {response.json()}")
     except requests.exceptions.RequestException as e:
         logger.error(
-            f"Failed to update receipt message ID for order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
+            f"Failed to update receipt for order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
         )
-        await message.reply("خطا در ذخیره پیام رسید! لطفاً دوباره تلاش کنید.")
+        await message.reply("خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.")
         return
 
     await message.reply("رسید شما برای ادمین ارسال شد. منتظر تأیید باشید.")
