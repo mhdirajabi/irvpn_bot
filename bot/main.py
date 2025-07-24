@@ -430,7 +430,9 @@ async def process_client_type(callback: types.CallbackQuery):
         return
 
     client_type, token = callback.data.split("_")[1:3]
-    response = requests.get(f"{API_BASE_URL}/api/sub/{token}/{client_type}", timeout=2000)
+    response = requests.get(
+        f"{API_BASE_URL}/api/sub/{token}/{client_type}", timeout=2000
+    )
     if response.status_code == 200:
         await callback.message.reply(f"لینک اشتراک ({client_type}):\n{response.text}")
     else:
