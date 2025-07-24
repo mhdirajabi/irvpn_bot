@@ -128,7 +128,7 @@ async def upload_receipt(file_id: str, order_id: str, bot: Bot):
         data = {"order_id": order_id, "file_url": file_url}
         logger.debug(f"Sending receipt to Django: {data}")
         response = requests.post(
-            f"{DJANGO_API_URL}/receipts/", json=data, timeout=5, verify=True
+            f"{DJANGO_API_URL}/receipts", json=data, timeout=5, verify=True
         )
         response.raise_for_status()
         logger.info(f"Receipt uploaded for order {order_id}: {response.json()}")
@@ -253,7 +253,7 @@ async def check_pending_orders():
         try:
             response = requests.get(
                 f"{DJANGO_API_URL}/orders?status=pending",
-                timeout=2000,
+                timeout=2,
             )
             if response.status_code == 200:
                 orders = response.json()
@@ -693,7 +693,7 @@ async def handle_receipt(message: types.Message, bot: Bot):
         return
 
     try:
-        url = f"{DJANGO_API_URL}/orders/?telegram_id={user_id}&status=pending"
+        url = f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending"
         logger.debug(f"Sending GET request to: {url}")
         response = requests.get(url, timeout=5, verify=True)
         response.raise_for_status()
@@ -762,7 +762,7 @@ async def handle_receipt(message: types.Message, bot: Bot):
 
     try:
         response = requests.put(  # تغییر به PUT برای آپدیت سفارش
-            f"{DJANGO_API_URL}/orders/{order_id}/",
+            f"{DJANGO_API_URL}/orders/{order_id}",
             json={
                 "order_id": order_id,
                 "file_url": receipt_url,
@@ -794,7 +794,7 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
     logger.debug(f"Processing {action} for order {order_id}")
 
     try:
-        response = requests.get(f"{DJANGO_API_URL}/orders/{order_id}/", timeout=5)
+        response = requests.get(f"{DJANGO_API_URL}/orders/{order_id}", timeout=5)
         response.raise_for_status()
         order = response.json()
         telegram_id, plan_id, is_renewal = (
@@ -833,7 +833,7 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
                         username,
                     )
                     response = requests.put(
-                        f"{DJANGO_API_URL}/orders/{order_id}/",
+                        f"{DJANGO_API_URL}/orders/{order_id}",
                         json={"status": "confirmed", "telegram_id": telegram_id},
                         headers={"Content-Type": "application/json"},
                         timeout=5,
@@ -867,7 +867,7 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
                     token = user_info["subscription_url"].split("/")[-2]
                     save_user_token(telegram_id, token, username)
                     response = requests.put(
-                        f"{DJANGO_API_URL}/orders/{order_id}/",
+                        f"{DJANGO_API_URL}/orders/{order_id}",
                         json={"status": "confirmed", "telegram_id": telegram_id},
                         headers={"Content-Type": "application/json"},
                         timeout=5,
@@ -900,7 +900,7 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
     else:
         try:
             response = requests.put(
-                f"{DJANGO_API_URL}/orders/{order_id}/",
+                f"{DJANGO_API_URL}/orders/{order_id}",
                 json={"status": "rejected", "telegram_id": telegram_id},
                 headers={"Content-Type": "application/json"},
                 timeout=5,
