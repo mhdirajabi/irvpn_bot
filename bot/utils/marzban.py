@@ -3,7 +3,7 @@ from config import ADMIN_PASSWORD, ADMIN_USERNAME, API_BASE_URL
 
 
 def get_jwt_token():
-    url = f"{API_BASE_URL}/admin/token"
+    url = f"{API_BASE_URL}/api/admin/token"
     data = {
         "username": ADMIN_USERNAME,
         "password": ADMIN_PASSWORD,
