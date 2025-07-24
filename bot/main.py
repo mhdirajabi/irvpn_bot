@@ -691,7 +691,7 @@ async def handle_receipt(message: types.Message, bot: Bot):
         return
 
     try:
-        url = f"{DJANGO_API_URL}/orders?telegram_id={user_id}&status=pending"
+        url = f"{DJANGO_API_URL}/orders/?telegram_id={user_id}&status=pending"
         logger.debug(f"Sending GET request to: {url}")
         response = requests.get(url, timeout=5, verify=True)
         response.raise_for_status()
@@ -699,7 +699,22 @@ async def handle_receipt(message: types.Message, bot: Bot):
         logger.info(f"Orders fetched for user {user_id}: {orders}")
         if not orders:
             logger.warning(f"No pending orders found for user {user_id}")
-            await message.reply("هیچ سفارش در حال انتظاری برای شما وجود ندارد!")
+            all_orders_response = requests.get(
+                f"{DJANGO_API_URL}/orders/?telegram_id={user_id}",
+                timeout=5,
+                verify=True,
+            )
+            all_orders = (
+                all_orders_response.json()
+                if all_orders_response.status_code == 200
+                else []
+            )
+            logger.debug(f"All orders for user {user_id}: {all_orders}")
+            await message.reply(
+                f"هیچ سفارش در حال انتظاری برای شما وجود ندارد! "
+                f"لطفاً مطمئن شوید که سفارش خود را ثبت کرده‌اید.\n"
+                f"وضعیت سفارش‌ها: {all_orders if all_orders else 'هیچ سفارشی یافت نشد'}"
+            )
             return
         order = sorted(orders, key=lambda x: x["created_at"], reverse=True)[0]
         order_id, plan_id, is_renewal = (
@@ -727,11 +742,11 @@ async def handle_receipt(message: types.Message, bot: Bot):
         return
 
     try:
-        file = await bot.get_file(message.photo[-1].file_id)
-        receipt_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+        file_id = message.photo[-1].file_id
+        receipt_url = await upload_receipt(file_id, order_id, bot)
     except Exception as e:
-        logger.error(f"Failed to get file for order {order_id}: {e}")
-        await message.reply("خطا در دریافت فایل رسید!")
+        logger.error(f"Failed to upload receipt for order {order_id}: {e}")
+        await message.reply("خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.")
         return
 
     keyboard = InlineKeyboardMarkup(
@@ -763,7 +778,6 @@ async def handle_receipt(message: types.Message, bot: Bot):
             f"{DJANGO_API_URL}/orders/{order_id}/",
             json={
                 "order_id": order_id,
-                "file_url": receipt_url,
                 "receipt_message_id": receipt_message.message_id,
                 "telegram_id": user_id,
                 "status": "pending",
@@ -773,12 +787,15 @@ async def handle_receipt(message: types.Message, bot: Bot):
             verify=True,
         )
         response.raise_for_status()
-        logger.info(f"Receipt updated for order {order_id}: {response.json()}")
+        logger.info(
+            f"Receipt message ID updated for order {order_id}: {response.json()}"
+        )
     except requests.exceptions.RequestException as e:
         logger.error(
-            f"Failed to update receipt for order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
+            f"Failed to update receipt message ID for order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
         )
-        await message.reply("خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.")
+        await message.reply("خطا در ذخیره پیام رسید! لطفاً دوباره تلاش کنید.")
+        return
 
     await message.reply("رسید شما برای ادمین ارسال شد. منتظر تأیید باشید.")
 

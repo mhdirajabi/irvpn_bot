@@ -115,21 +115,13 @@ class OrderUpdateView(APIView):
         logger.debug(f"Updating order {order_id} with data: {request.data}")
         try:
             order = Order.objects.get(order_id=order_id)
-            status_param = request.data.get("status")
-            if status_param not in ["confirmed", "rejected"]:
-                logger.error(f"Invalid status: {status_param}")
-                return Response(
-                    {"error": "Status must be 'confirmed' or 'rejected'"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            order.status = status_param
-            order.save()
-            logger.info(f"Order {order_id} updated to status: {status_param}")
-            return Response(
-                {"order_id": order_id, "status": status_param},
-                status=status.HTTP_200_OK,
-            )
+            serializer = OrderSerializer(order, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                logger.info(f"Order {order_id} updated: {serializer.data}")
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            logger.error(f"Invalid data for order {order_id}: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Order.DoesNotExist:
             logger.error(f"Order not found: {order_id}")
             return Response(

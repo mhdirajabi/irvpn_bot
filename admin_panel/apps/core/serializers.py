@@ -37,6 +37,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "receipt_url",
             "receipt_message_id",
         ]
+        read_only_fields = ["created_at"]
 
     def validate(self, data):
         logger.debug(f"Validating order data: {data}")
@@ -53,4 +54,13 @@ class OrderSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Invalid created_at format"
                 ) from ValueError
+        if "status" in data and data["status"] not in [
+            "pending",
+            "confirmed",
+            "rejected",
+        ]:
+            logger.error(f"Invalid status: {data['status']}")
+            raise serializers.ValidationError(
+                "Status must be 'pending', 'confirmed', or 'rejected'"
+            )
         return data
