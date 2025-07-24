@@ -3,10 +3,17 @@ from django.db import models
 
 
 class User(models.Model):
-    telegram_id = models.BigIntegerField(unique=True)
-    subscription_token = models.CharField(max_length=255, blank=True, null=True)
-    username = models.CharField(max_length=32, blank=True, null=True)
+    telegram_id = models.BigIntegerField(null=True, blank=True)
+    username = models.CharField(max_length=100, unique=True)
+    data_limit = models.BigIntegerField(null=True, blank=True)
+    expire = models.BigIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, default="active")
+    data_limit_reset_strategy = models.CharField(max_length=50, default="no_reset")
+    subscription_url = models.CharField(max_length=500, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "core_user"
 
     def __str__(self):
         return f"{self.username} ({self.telegram_id})"

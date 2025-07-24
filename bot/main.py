@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import requests
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from config import (
     ADMIN_TELEGRAM_ID,
     API_BASE_URL,
@@ -124,26 +124,6 @@ def update_order_status(
         print(f"Error syncing order status with Django: {e}")
 
 
-# async def upload_receipt(file_id: str, order_id: str, bot: Bot):
-#     logger.debug(f"Uploading receipt for order {order_id}, file_id: {file_id}")
-#     try:
-#         file = await bot.get_file(file_id)
-#         file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-#         data = {"order_id": order_id, "file_url": file_url}
-#         logger.debug(f"Sending receipt to Django: {data}")
-#         response = requests.post(
-#             f"{DJANGO_API_URL}/receipts/", json=data, timeout=5, verify=True
-#         )
-#         response.raise_for_status()
-#         logger.info(f"Receipt uploaded for order {order_id}: {response.json()}")
-#         return response.json().get("file_url")
-#     except requests.exceptions.RequestException as e:
-#         logger.error(
-#             f"Failed to upload receipt for order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
-#         )
-#         raise Exception(f"Failed to upload receipt: {e}") from e
-
-
 def get_subscription_info(token: str):
     response = requests.get(
         f"{API_BASE_URL}/sub/{token}/info",
@@ -154,7 +134,13 @@ def get_subscription_info(token: str):
     return None
 
 
-def create_user(username: str, data_limit: int, expire_days: int, users: str):
+def create_user(
+    username: str,
+    data_limit: int,
+    expire_days: int,
+    users: str,
+    telegram_id: int = None,
+):
     logger.debug(
         f"Creating user {username} with data_limit={data_limit}, expire_days={expire_days}, users={users}"
     )
@@ -192,6 +178,29 @@ def create_user(username: str, data_limit: int, expire_days: int, users: str):
         response.raise_for_status()
         user_info = response.json()
         logger.info(f"User {username} created successfully: {user_info}")
+        try:
+            django_payload = {
+                "telegram_id": telegram_id,
+                "username": username,
+                "data_limit": data_limit,
+                "expire": expire_timestamp,
+                "status": "active",
+                "data_limit_reset_strategy": "no_reset",
+                "subscription_url": user_info.get("subscription_url", ""),
+            }
+            django_response = requests.post(
+                f"{DJANGO_API_URL}/users/",
+                json=django_payload,
+                headers={"Content-Type": "application/json"},
+                timeout=5,
+                verify=True,
+            )
+            django_response.raise_for_status()
+            logger.info(f"User {username} saved in Django: {django_response.json()}")
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                f"Failed to save user {username} in Django: {e}, response: {django_response.text if 'django_response' in locals() else 'No response'}"
+            )
         return user_info
     except requests.exceptions.RequestException as e:
         logger.error(
@@ -200,7 +209,13 @@ def create_user(username: str, data_limit: int, expire_days: int, users: str):
         return None
 
 
-def renew_user(username: str, data_limit: int, expire_days: int, users: str):
+def renew_user(
+    username: str,
+    data_limit: int,
+    expire_days: int,
+    users: str,
+    telegram_id: int = None,
+):
     logger.debug(
         f"Renewing user {username} with data_limit={data_limit}, expire_days={expire_days}, users={users}"
     )
@@ -236,6 +251,29 @@ def renew_user(username: str, data_limit: int, expire_days: int, users: str):
         response.raise_for_status()
         user_info = response.json()
         logger.info(f"User {username} renewed successfully: {user_info}")
+        try:
+            django_payload = {
+                "telegram_id": telegram_id,
+                "username": username,
+                "data_limit": data_limit,
+                "expire": expire_timestamp,
+                "status": "active",
+                "data_limit_reset_strategy": "no_reset",
+                "subscription_url": user_info.get("subscription_url", ""),
+            }
+            django_response = requests.put(
+                f"{DJANGO_API_URL}/users/{username}",
+                json=django_payload,
+                headers={"Content-Type": "application/json"},
+                timeout=5,
+                verify=True,
+            )
+            django_response.raise_for_status()
+            logger.info(f"User {username} updated in Django: {django_response.json()}")
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                f"Failed to update user {username} in Django: {e}, response: {django_response.text if 'django_response' in locals() else 'No response'}"
+            )
         return user_info
     except requests.exceptions.RequestException as e:
         logger.error(
@@ -355,67 +393,55 @@ async def settoken_command(message: types.Message):
 
 @dp.message(Command("status"))
 async def status_command(message: types.Message):
-    user_id = message.from_user.id
-    if not await check_channel_membership(user_id):
-        await message.reply(f"لطفاً ابتدا در کانال ما عضو شوید: {CHANNEL_ID}")
-        return
-
-    token, username = get_user_data(user_id)
-    if not token:
-        await message.reply("لطفاً اول کد اشتراک رو با /settoken وارد کنید.")
-        return
-
-    user_info = get_subscription_info(token)
-    if user_info:
-        data_limit = user_info.get("data_limit", 0) / 1073741824
-        used_traffic = user_info.get("used_traffic", 0) / 1073741824
-        expire = user_info.get("expire", 0)
-        expire_date = (
-            "لایف‌تایم"
-            if expire == 0
-            else datetime.fromtimestamp(expire).strftime("%Y-%m-%d")
+    telegram_id = message.from_user.id
+    try:
+        response = requests.get(
+            f"{DJANGO_API_URL}/users/?telegram_id={telegram_id}",
+            timeout=5,
+            verify=True,
         )
-        reply = (
-            f"وضعیت اکانت:\n"
-            f"نام کاربری: {user_info['username']}\n"
-            f"حجم کل: {data_limit:.2f} GB\n"
-            f"حجم مصرف‌شده: {used_traffic:.2f} GB\n"
-            f"تاریخ انقضا: {expire_date}\n"
-            f"لینک اشتراک: {user_info['subscription_url']}"
+        response.raise_for_status()
+        users = response.json()
+        if not users:
+            await message.answer("هیچ اکانتی برای شما پیدا نشد!")
+            return
+        user = users[0]
+        await message.answer(
+            f"وضعیت اکانت شما:\n"
+            f"نام کاربری: {user['username']}\n"
+            f"حجم: {user['data_limit'] / 1073741824 if user['data_limit'] else 'نامحدود'} گیگابایت\n"
+            f"انقضا: {datetime.fromtimestamp(user['expire']).strftime('%Y-%m-%d') if user['expire'] else 'لایف‌تایم'}\n"
+            f"وضعیت: {user['status']}"
         )
-    else:
-        reply = "خطا: اطلاعات اکانت پیدا نشد! لطفاً کد اشتراک معتبر وارد کنید."
-
-    await message.reply(reply)
+    except requests.exceptions.RequestException as e:
+        await message.answer("خطا در دریافت اطلاعات اکانت!")
+        logger.error(f"Failed to fetch user status for telegram_id={telegram_id}: {e}")
 
 
 @dp.message(Command("getlink"))
 async def getlink_command(message: types.Message):
-    user_id = message.from_user.id
-    if not await check_channel_membership(user_id):
-        await message.reply(f"لطفاً ابتدا در کانال ما عضو شوید: {CHANNEL_ID}")
-        return
-
-    token, _ = get_user_data(user_id)
-    if not token:
-        await message.reply("لطفاً اول کد اشتراک رو با /settoken وارد کنید.")
-        return
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="V2Ray", callback_data=f"getlink_v2ray_{token}"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="Clash", callback_data=f"getlink_clash_{token}"
-                )
-            ],
-        ]
-    )
-    await message.reply("لطفاً نوع کلاینت رو انتخاب کنید:", reply_markup=keyboard)
+    telegram_id = message.from_user.id
+    try:
+        response = requests.get(
+            f"{DJANGO_API_URL}/api/users/?telegram_id={telegram_id}",
+            timeout=5,
+            verify=True,
+        )
+        response.raise_for_status()
+        users = response.json()
+        if not users:
+            await message.answer("هیچ اکانتی برای شما پیدا نشد!")
+            return
+        user = users[0]
+        if user.get("subscription_url"):
+            await message.answer(f"لینک اشتراک شما:\n{user['subscription_url']}")
+        else:
+            await message.answer("لینک اشتراک برای شما وجود ندارد!")
+    except requests.exceptions.RequestException as e:
+        await message.answer("خطا در دریافت لینک اشتراک!")
+        logger.error(
+            f"Failed to fetch subscription link for telegram_id={telegram_id}: {e}"
+        )
 
 
 @dp.callback_query(lambda c: c.data.startswith("getlink_"))
@@ -798,7 +824,7 @@ async def handle_receipt(message: types.Message, bot: Bot):
 
 
 @dp.callback_query(lambda c: c.data.startswith(("confirm_", "reject_")))
-async def process_order_action(callback: types.CallbackQuery, bot: Bot):
+async def process_order_action(callback: CallbackQuery, bot: Bot):
     if not await is_admin(callback.from_user.id):
         await callback.answer("فقط ادمین می‌تواند این عملیات را انجام دهد!")
         return
@@ -807,7 +833,9 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
     logger.debug(f"Processing {action} for order {order_id}")
 
     try:
-        response = requests.get(f"{DJANGO_API_URL}/orders/{order_id}/", timeout=5)
+        response = requests.get(
+            f"{DJANGO_API_URL}/orders/{order_id}/", timeout=5, verify=True
+        )
         response.raise_for_status()
         order = response.json()
         telegram_id, plan_id, is_renewal = (
@@ -837,7 +865,11 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
             token, username = get_user_data(telegram_id)
             if is_renewal and username:
                 user_info = renew_user(
-                    username, plan["data_limit"], plan["expire_days"], plan["users"]
+                    username,
+                    plan["data_limit"],
+                    plan["expire_days"],
+                    plan["users"],
+                    telegram_id,
                 )
                 if user_info and "subscription_url" in user_info:
                     save_user_token(
@@ -850,6 +882,7 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
                         json={"status": "confirmed", "telegram_id": telegram_id},
                         headers={"Content-Type": "application/json"},
                         timeout=5,
+                        verify=True,
                     )
                     response.raise_for_status()
                     logger.info(f"Order {order_id} confirmed")
@@ -870,11 +903,17 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
                     logger.error(
                         f"Failed to renew user for order {order_id}: user_info={user_info}"
                     )
-                    await callback.answer("خطا در تمدید اکانت!")
+                    await callback.answer(
+                        f"خطا در تمدید اکانت: {user_info.get('error', 'Unknown error')}"
+                    )
             else:
                 username = f"user_{uuid.uuid4().hex[:8]}"
                 user_info = create_user(
-                    username, plan["data_limit"], plan["expire_days"], plan["users"]
+                    username,
+                    plan["data_limit"],
+                    plan["expire_days"],
+                    plan["users"],
+                    telegram_id,
                 )
                 if user_info and "subscription_url" in user_info:
                     token = user_info["subscription_url"].split("/")[-2]
@@ -884,6 +923,7 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
                         json={"status": "confirmed", "telegram_id": telegram_id},
                         headers={"Content-Type": "application/json"},
                         timeout=5,
+                        verify=True,
                     )
                     response.raise_for_status()
                     logger.info(f"Order {order_id} confirmed")
@@ -904,12 +944,14 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
                     logger.error(
                         f"Failed to create user for order {order_id}: user_info={user_info}"
                     )
-                    await callback.answer("خطا در ایجاد اکانت!")
+                    await callback.answer(
+                        f"خطا در ایجاد اکانت: {user_info.get('error', 'Unknown error')}"
+                    )
         except requests.exceptions.RequestException as e:
             logger.error(
                 f"Failed to confirm order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
             )
-            await callback.answer("خطا در تأیید سفارش!")
+            await callback.answer(f"خطا در تأیید سفارش: {str(e)}")
     else:
         try:
             response = requests.put(
@@ -917,6 +959,7 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
                 json={"status": "rejected", "telegram_id": telegram_id},
                 headers={"Content-Type": "application/json"},
                 timeout=5,
+                verify=True,
             )
             response.raise_for_status()
             logger.info(f"Order {order_id} rejected")
@@ -932,9 +975,7 @@ async def process_order_action(callback: types.CallbackQuery, bot: Bot):
             logger.error(
                 f"Failed to reject order {order_id}: {e}, response: {response.text if 'response' in locals() else 'No response'}"
             )
-            await callback.answer("خطا در رد سفارش!")
-
-    await callback.answer()
+            await callback.answer(f"خطا در رد سفارش: {str(e)}")
 
 
 async def main():

@@ -19,7 +19,15 @@ logger.addHandler(console_handler)
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["telegram_id", "subscription_token", "username", "created_at"]
+        fields = [
+            "telegram_id",
+            "username",
+            "data_limit",
+            "expire",
+            "status",
+            "data_limit_reset_strategy",
+            "subscription_url",
+        ]
 
 
 class OrderSerializer(serializers.ModelSerializer):

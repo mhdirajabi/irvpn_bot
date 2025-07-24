@@ -24,24 +24,31 @@ logger.addHandler(console_handler)
 class UserListCreateView(APIView):
     def get(self, request):
         telegram_id = request.query_params.get("telegram_id")
+        logger.debug(f"Fetching users with telegram_id={telegram_id}")
         if telegram_id:
             users = User.objects.filter(telegram_id=telegram_id)
         else:
             users = User.objects.all()
         serializer = UserSerializer(users, many=True)
+        logger.info(f"Returning {len(serializer.data)} users")
         return Response(serializer.data)
 
     def post(self, request):
+        logger.debug(f"Creating user in Django with data: {request.data}")
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
+            logger.info(f"User {request.data.get('username')} saved in Django")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        logger.error(f"Failed to create user in Django: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request, telegram_id):
+    def put(self, request, username):
+        logger.debug(f"Updating user {username} with data: {request.data}")
         try:
-            user = User.objects.get(telegram_id=telegram_id)
+            user = User.objects.get(username=username)
         except User.DoesNotExist:
+            logger.error(f"User {username} not found in Django")
             return Response(
                 {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
             )
@@ -49,7 +56,9 @@ class UserListCreateView(APIView):
         serializer = UserSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            logger.info(f"User {username} updated in Django")
             return Response(serializer.data)
+        logger.error(f"Failed to update user {username} in Django: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
