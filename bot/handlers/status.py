@@ -1,6 +1,6 @@
-from aiogram import Bot, Router
+from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command, Text
+from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from config import CHANNEL_ID
 from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
@@ -13,7 +13,7 @@ router = Router()
 
 
 @router.message(Command("status"))
-@router.message(Text("📊 وضعیت اکانت"))
+@router.message(F.text == "📊 وضعیت اکانت")
 async def status_command(message: Message, bot: Bot):
     user_id = message.from_user.id
     if not await check_channel_membership(bot, user_id):
