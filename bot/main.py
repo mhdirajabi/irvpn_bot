@@ -5,7 +5,14 @@ from datetime import datetime, timedelta
 import requests
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
+from aiogram.types.message import Message
 from config import (
     ADMIN_TELEGRAM_ID,
     API_BASE_URL,
@@ -33,6 +40,18 @@ async def check_channel_membership(user_id: int) -> bool:
 
 async def is_admin(user_id: int) -> bool:
     return user_id == ADMIN_TELEGRAM_ID
+
+
+def get_main_menu():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    buttons = [
+        KeyboardButton("📊 وضعیت اکانت"),
+        KeyboardButton("🛒 خرید اکانت"),
+        KeyboardButton("🔄 تمدید اکانت"),
+        KeyboardButton("🔗 دریافت لینک"),
+    ]
+    keyboard.add(*buttons)
+    return keyboard
 
 
 def save_user_token(telegram_id: int, token: str, username: str):
@@ -342,28 +361,16 @@ async def start_command(message: types.Message):
         return
 
     is_admin_user = await is_admin(user_id)
-    if is_admin_user:
-        reply = (
-            "به ربات IRVPN خوش اومدی! 😊\n"
-            "دستورات ادمین:\n"
-            "/adduser - ایجاد کاربر جدید\n"
-            "/servers - مدیریت سرورها\n"
-            "/status - نمایش وضعیت کاربر\n"
-            "/getlink - دریافت لینک اشتراک\n"
-            "/buy - خرید اشتراک\n"
-            "/renew - تمدید اشتراک"
-        )
-    else:
-        reply = (
-            "به ربات IRVPN خوش اومدی! 😊\n"
-            "دستورات:\n"
-            "/settoken - ثبت کد اشتراک\n"
-            "/status - نمایش وضعیت اکانت\n"
-            "/getlink - دریافت لینک اشتراک\n"
-            "/buy - خرید اشتراک\n"
-            "/renew - تمدید اشتراک"
-        )
-    await message.reply(reply)
+    reply = (
+        "*به ربات IRVPN خوش اومدی!* 😊\n"
+        "لطفاً یکی از گزینه‌های زیر رو انتخاب کن:\n\n"
+        f"{'*دستورات ادمین*:\n/adduser - ایجاد کاربر جدید\n/servers - مدیریت سرورها\n' if is_admin_user else ''}"
+        "📊 *وضعیت اکانت*: بررسی وضعیت اشتراک\n"
+        "🛒 *خرید اکانت*: خرید اکانت جدید\n"
+        "🔄 *تمدید اکانت*: تمدید اشتراک موجود\n"
+        "🔗 *دریافت لینک*: دریافت لینک اشتراک"
+    )
+    await message.reply(reply, parse_mode="Markdown", reply_markup=get_main_menu())
 
 
 @dp.message(Command("settoken"))
@@ -391,6 +398,7 @@ async def settoken_command(message: types.Message):
         await message.reply("کد اشتراک نامعتبره! لطفاً دوباره امتحان کن.")
 
 
+@dp.message(lambda message: message.text == "📊 وضعیت اکانت")
 @dp.message(Command("status"))
 async def status_command(message: types.Message):
     telegram_id = message.from_user.id
@@ -403,18 +411,22 @@ async def status_command(message: types.Message):
         response.raise_for_status()
         users = response.json()
         if not users:
-            await message.answer("هیچ اکانتی برای شما پیدا نشد!")
+            await message.answer(
+                "⚠️ *هیچ اکانتی برای شما پیدا نشد!*", parse_mode="Markdown"
+            )
             return
         user = users[0]
         await message.answer(
-            f"وضعیت اکانت شما:\n"
-            f"نام کاربری: {user['username']}\n"
-            f"حجم: {user['data_limit'] / 1073741824 if user['data_limit'] else 'نامحدود'} گیگابایت\n"
-            f"انقضا: {datetime.fromtimestamp(user['expire']).strftime('%Y-%m-%d') if user['expire'] else 'لایف‌تایم'}\n"
-            f"وضعیت: {user['status']}"
+            f"*وضعیت اکانت شما:* 📋\n"
+            f"👤 *نام کاربری*: {user['username']}\n"
+            f"📈 *حجم*: {user['data_limit'] / 1073741824 if user['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
+            f"⏳ *انقضا*: {datetime.fromtimestamp(user['expire']).strftime('%Y-%m-%d') if user['expire'] else '♾️ لایف‌تایم'}\n"
+            f"✅ *وضعیت*: {user['status']}",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
         )
     except requests.exceptions.RequestException as e:
-        await message.answer("خطا در دریافت اطلاعات اکانت!")
+        await message.answer("❌ *خطا در دریافت اطلاعات اکانت!*", parse_mode="Markdown")
         logger.error(f"Failed to fetch user status for telegram_id={telegram_id}: {e}")
 
 
@@ -522,6 +534,7 @@ async def servers_command(message: types.Message):
         await message.reply(f"خطا در دریافت لیست سرورها: {response.text}")
 
 
+@dp.message(lambda message: message.text == "🛒 خرید اکانت")
 @dp.message(Command("buy"))
 async def buy_command(message: types.Message):
     user_id = message.from_user.id
@@ -531,41 +544,65 @@ async def buy_command(message: types.Message):
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="اکانت حجمی", callback_data="buy_volume")],
-            [InlineKeyboardButton(text="اکانت نامحدود", callback_data="buy_unlimited")],
-            [InlineKeyboardButton(text="اکانت تست", callback_data="buy_test")],
+            [InlineKeyboardButton(text="📈 اکانت حجمی", callback_data="buy_volume")],
+            [
+                InlineKeyboardButton(
+                    text="♾️ اکانت نامحدود", callback_data="buy_unlimited"
+                )
+            ],
+            [InlineKeyboardButton(text="🧪 اکانت تست", callback_data="buy_test")],
+            [InlineKeyboardButton(text="⬅️ بازگشت", callback_data="back_to_main")],
         ]
     )
-    await message.reply("لطفاً نوع اکانت را انتخاب کنید:", reply_markup=keyboard)
+    await message.reply(
+        "*لطفاً نوع اکانت را انتخاب کنید:*", parse_mode="Markdown", reply_markup=keyboard
+    )
+
+
+@dp.callback_query(lambda c: c.data == "back_to_main")
+async def back_to_main(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
+        parse_mode="Markdown",
+        reply_markup=get_main_menu(),
+    )
+    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("buy_"))
 async def process_account_type(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     if not await check_channel_membership(user_id):
-        await callback.message.reply(f"لطفاً ابتدا در کانال ما عضو شوید: {CHANNEL_ID}")
+        await callback.message.reply(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}", parse_mode="Markdown"
+        )
         return
 
     account_type = callback.data.split("_")[1]
     plans = PLANS.get(account_type, {})
     if not plans:
-        await callback.message.reply("نوع اکانت نامعتبر است!")
+        await callback.message.reply(
+            "❌ *نوع اکانت نامعتبر است!*", parse_mode="Markdown"
+        )
         return
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=f"پلن {plan_id}: {plan['data_limit'] / 1073741824 if plan['data_limit'] else 'نامحدود'} گیگ، "
+                    text=f"📦 پلن {plan_id}: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگ، "
                     f"{plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز، {plan['price']} تومان",
                     callback_data=f"select_{account_type}_{plan_id}",
                 )
             ]
             for plan_id, plan in plans.items()
         ]
+        + [[InlineKeyboardButton(text="⬅️ بازگشت", callback_data="buy_back")]]
     )
-    await callback.message.reply(
-        f"لطفاً پلن {account_type} مورد نظر را انتخاب کنید:", reply_markup=keyboard
+    await callback.message.edit_text(
+        f"*لطفاً پلن {account_type} مورد نظر را انتخاب کنید:*",
+        parse_mode="Markdown",
+        reply_markup=keyboard,
     )
     await callback.answer()
 
@@ -615,6 +652,28 @@ async def process_plan_selection(callback: types.CallbackQuery):
         f"لطفاً مبلغ را به شماره کارت زیر واریز کنید و رسید را ظرف 30 دقیقه ارسال کنید:\n"
         f"شماره کارت: {CARD_NUMBER} (به نام {CARD_HOLDER})\n\n"
         f"برای ارسال رسید، کافیست عکس رسید را در همین چت بفرستید."
+    )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data == "buy_back")
+async def buy_back(callback: CallbackQuery):
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📈 اکانت حجمی", callback_data="buy_volume")],
+            [
+                InlineKeyboardButton(
+                    text="♾️ اکانت نامحدود", callback_data="buy_unlimited"
+                )
+            ],
+            [InlineKeyboardButton(text="🧪 اکانت تست", callback_data="buy_test")],
+            [InlineKeyboardButton(text="⬅️ بازگشت", callback_data="back_to_main")],
+        ]
+    )
+    await callback.message.edit_text(
+        "*لطفاً نوع اکانت را انتخاب کنید:*",
+        parse_mode="Markdown",
+        reply_markup=keyboard,
     )
     await callback.answer()
 
