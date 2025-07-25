@@ -12,7 +12,6 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
-from aiogram.types.message import Message
 from config import (
     ADMIN_TELEGRAM_ID,
     API_BASE_URL,
@@ -43,14 +42,20 @@ async def is_admin(user_id: int) -> bool:
 
 
 def get_main_menu():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    buttons = [
-        KeyboardButton("📊 وضعیت اکانت"),
-        KeyboardButton("🛒 خرید اکانت"),
-        KeyboardButton("🔄 تمدید اکانت"),
-        KeyboardButton("🔗 دریافت لینک"),
-    ]
-    keyboard.add(*buttons)
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="📊 وضعیت اکانت"),
+                KeyboardButton(text="🛒 خرید اکانت"),
+            ],
+            [
+                KeyboardButton(text="🔄 تمدید اکانت"),
+                KeyboardButton(text="🔗 دریافت لینک"),
+            ],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=False,
+    )
     return keyboard
 
 
@@ -355,8 +360,9 @@ async def start_command(message: types.Message):
     user_id = message.from_user.id
     if not await check_channel_membership(user_id):
         await message.reply(
-            f"لطفاً ابتدا در کانال ما عضو شوید: {CHANNEL_ID}\n"
-            "بعد از عضویت، دوباره /start رو بزنید."
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}\n"
+            "بعد از عضویت، دوباره /start رو بزنید.",
+            parse_mode="Markdown",
         )
         return
 
@@ -555,7 +561,9 @@ async def buy_command(message: types.Message):
         ]
     )
     await message.reply(
-        "*لطفاً نوع اکانت را انتخاب کنید:*", parse_mode="Markdown", reply_markup=keyboard
+        "*لطفاً نوع اکانت را انتخاب کنید:*",
+        parse_mode="Markdown",
+        reply_markup=keyboard,
     )
 
 
@@ -574,7 +582,8 @@ async def process_account_type(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     if not await check_channel_membership(user_id):
         await callback.message.reply(
-            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}", parse_mode="Markdown"
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
+            parse_mode="Markdown",
         )
         return
 
