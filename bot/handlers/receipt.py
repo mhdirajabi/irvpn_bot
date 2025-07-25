@@ -4,7 +4,7 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from config import ADMIN_TELEGRAM_ID, BOT_TOKEN, CHANNEL_ID
-from keyboards.main_menu import get_channel_keyboard, get_menu
+from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
 from keyboards.receipt_menu import get_receipt_admin_menu
 from services.check_channel_membership import check_channel_membership
 from services.order_service import order_service
