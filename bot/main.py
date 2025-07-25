@@ -4,13 +4,14 @@ from datetime import datetime, timedelta
 
 import requests
 from aiogram import Bot, Dispatcher, F, types
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
     KeyboardButton,
+    ReplyKeyboardMarkup,
 )
 from config import (
     ADMIN_TELEGRAM_ID,
@@ -375,30 +376,42 @@ async def check_expiring_users():
         await asyncio.sleep(3600)
 
 
+@dp.callback_query(lambda c: c.data == "main_buy")
+async def main_buy(callback: CallbackQuery):
+    logger.debug(f"Received callback: main_buy from user {callback.from_user.id}")
+    try:
+        # سعی می‌کنیم پیام قبلی رو پاک کنیم
+        await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in main_buy: {str(e)}")
+        # اگر پیام پیدا نشد، ادامه می‌دیم بدون توقف
+    try:
+        await buy_command(callback.message)
+    except Exception as e:
+        logger.error(f"Error in main_buy: {str(e)}")
+        await callback.message.answer(
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+    await callback.answer()
+
+
 @dp.callback_query(lambda c: c.data == "main_status")
 async def main_status(callback: CallbackQuery):
     logger.debug(f"Received callback: main_status from user {callback.from_user.id}")
     try:
         await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in main_status: {str(e)}")
+    try:
         await status_command(callback.message)
     except Exception as e:
         logger.error(f"Error in main_status: {str(e)}")
         await callback.message.answer(
-            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
-        )
-    await callback.answer()
-
-
-@dp.callback_query(lambda c: c.data == "main_buy")
-async def main_buy(callback: CallbackQuery):
-    logger.debug(f"Received callback: main_buy from user {callback.from_user.id}")
-    try:
-        await callback.message.delete()
-        await buy_command(callback.message)
-    except Exception as e:
-        logger.error(f"Error in main_buy: {str(e)}")
-        await callback.message.answer(
-            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
         )
     await callback.answer()
 
@@ -408,11 +421,16 @@ async def main_renew(callback: CallbackQuery):
     logger.debug(f"Received callback: main_renew from user {callback.from_user.id}")
     try:
         await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in main_renew: {str(e)}")
+    try:
         await renew_command(callback.message)
     except Exception as e:
         logger.error(f"Error in main_renew: {str(e)}")
         await callback.message.answer(
-            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
         )
     await callback.answer()
 
@@ -422,11 +440,16 @@ async def main_getlink(callback: CallbackQuery):
     logger.debug(f"Received callback: main_getlink from user {callback.from_user.id}")
     try:
         await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in main_getlink: {str(e)}")
+    try:
         await getlink_command(callback.message)
     except Exception as e:
         logger.error(f"Error in main_getlink: {str(e)}")
         await callback.message.answer(
-            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
         )
     await callback.answer()
 
@@ -652,6 +675,9 @@ async def buy_back(callback: CallbackQuery):
     logger.debug(f"Received callback: buy_back from user {callback.from_user.id}")
     try:
         await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in buy_back: {str(e)}")
+    try:
         await callback.message.answer(
             "*لطفاً نوع اکانت را انتخاب کنید:*",
             parse_mode="Markdown",
@@ -683,7 +709,9 @@ async def buy_back(callback: CallbackQuery):
     except Exception as e:
         logger.error(f"Error in buy_back: {str(e)}")
         await callback.message.answer(
-            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
         )
     await callback.answer()
 
@@ -692,7 +720,10 @@ async def buy_back(callback: CallbackQuery):
 async def back_to_main(callback: CallbackQuery):
     logger.debug(f"Received callback: back_to_main from user {callback.from_user.id}")
     try:
-        await callback.message.delete()  # پیام قبلی رو پاک می‌کنیم
+        await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in back_to_main: {str(e)}")
+    try:
         await callback.message.answer(
             "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
             parse_mode="Markdown",
@@ -701,7 +732,9 @@ async def back_to_main(callback: CallbackQuery):
     except Exception as e:
         logger.error(f"Error in back_to_main: {str(e)}")
         await callback.message.answer(
-            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
         )
     await callback.answer()
 
