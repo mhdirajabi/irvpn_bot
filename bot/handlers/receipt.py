@@ -7,7 +7,12 @@ from config import ADMIN_TELEGRAM_ID, BOT_TOKEN, CHANNEL_ID
 from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
 from keyboards.receipt_menu import get_receipt_admin_menu
 from services.check_channel_membership import check_channel_membership
-from services.order_service import order_service
+from services.order_service import (
+    get_order,
+    get_orders,
+    get_pending_orders,
+    update_order,
+)
 from services.user_service import (
     create_user,
     get_user_data,
@@ -25,9 +30,9 @@ router = Router()
 @router.message(F.photo)
 async def handle_receipt(message: Message, bot: Bot):
     user_id = str(message.from_user.id)
-    order_logger.info(f"Handling receipt for user: {user_id}")
+    logger.info(f"Handling receipt for user: {user_id}")
     if not await check_channel_membership(bot, user_id):
-        order_logger.warning(f"User {user_id} not in channel {CHANNEL_ID}")
+        logger.warning(f"User {user_id} not in channel {CHANNEL_ID}")
         await message.reply(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
             parse_mode="Markdown",
@@ -36,11 +41,11 @@ async def handle_receipt(message: Message, bot: Bot):
         return
 
     try:
-        orders = await order_service.get_pending_orders(user_id)
-        order_logger.info(f"Orders fetched for user {user_id}: {orders}")
+        orders = await get_pending_orders(user_id)
+        logger.info(f"Orders fetched for user {user_id}: {orders}")
         if not orders:
-            order_logger.warning(f"No pending orders found for user {user_id}")
-            all_orders = await order_service.get_orders(user_id)
+            logger.warning(f"No pending orders found for user {user_id}")
+            all_orders = await get_orders(user_id)
             await message.reply(
                 f"⚠️ *هیچ سفارش در حال انتظاری برای شما وجود ندارد!* \n"
                 f"لطفاً مطمئن شوید که سفارش خود را ثبت کرده‌اید.\n"
@@ -56,11 +61,11 @@ async def handle_receipt(message: Message, bot: Bot):
             order.get("is_renewal", False),
         )
         plan_type, _ = plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
-        order_logger.debug(
+        logger.debug(
             f"Processing order: {order_id}, plan_id: {plan_id}, is_renewal: {is_renewal}"
         )
     except Exception as e:
-        order_logger.error(f"Error checking order for user {user_id}: {e}")
+        logger.error(f"Error checking order for user {user_id}: {e}")
         await message.reply(
             f"❌ *خطا در ارتباط با سرور*: {str(e)}", parse_mode="markdown"
         )
@@ -68,7 +73,7 @@ async def handle_receipt(message: Message, bot: Bot):
 
     plan = PLANS.get(plan_type, {}).get(plan_id)
     if not plan:
-        order_logger.error(f"Invalid plan: {plan_type}:{plan_id}")
+        logger.error(f"Invalid plan: {plan_type}:{plan_id}")
         await message.reply("❌ *پلن نامعتبر است!*", parse_mode="Markdown")
         return
 
@@ -90,10 +95,10 @@ async def handle_receipt(message: Message, bot: Bot):
             parse_mode="Markdown",
             reply_markup=get_receipt_admin_menu(order_id),
         )
-        order_logger.info(
+        logger.info(
             f"Receipt sent to admin for order {order_id}, message_id: {receipt_message.message_id}"
         )
-        await order_service.update_order(
+        await update_order(
             order_id,
             {
                 "receipt_url": receipt_url,
@@ -107,7 +112,7 @@ async def handle_receipt(message: Message, bot: Bot):
             reply_markup=get_menu(),
         )
     except Exception as e:
-        order_logger.error(f"Failed to process receipt for order {order_id}: {e}")
+        logger.error(f"Failed to process receipt for order {order_id}: {e}")
         await message.reply(
             f"❌ *خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.*: {str(e)}",
             parse_mode="Markdown",
@@ -124,25 +129,25 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
         return
 
     action, order_id = callback.data.split("_")
-    order_logger.info(f"Processing {action} for order {order_id}")
+    logger.info(f"Processing {action} for order {order_id}")
 
     try:
-        order = await order_service.get_order(order_id)
+        order = await get_order(order_id)
         telegram_id, plan_id, is_renewal = (
             order["telegram_id"],
             order["plan"],
             order.get("is_renewal", False),
         )
         plan_type, _ = plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
-        order_logger.info(f"Order {order_id} fetched successfully")
+        logger.info(f"Order {order_id} fetched successfully")
     except Exception as e:
-        order_logger.error(f"Failed to fetch order {order_id}: {e}")
+        logger.error(f"Failed to fetch order {order_id}: {e}")
         await callback.answer("❌ سفارش یافت نشد!", show_alert=True)
         return
 
     plan = PLANS.get(plan_type, {}).get(plan_id)
     if not plan:
-        order_logger.error(f"Invalid plan: {plan_type}:{plan_id}")
+        logger.error(f"Invalid plan: {plan_type}:{plan_id}")
         await callback.answer("❌ پلن نامعتبره!", show_alert=True)
         return
 
@@ -163,7 +168,7 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                         user_info["subscription_url"].split("/")[-2],
                         username,
                     )
-                    await order_service.update_order(order_id, {"status": "confirmed"})
+                    await update_order(order_id, {"status": "confirmed"})
                     await bot.send_message(
                         telegram_id,
                         f"""
@@ -184,7 +189,7 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                     )
                     await callback.answer("تمدید اکانت تأیید شد!")
                 else:
-                    order_logger.error(
+                    logger.error(
                         f"Failed to renew user for order {order_id}: {user_info}"
                     )
                     await callback.answer(
@@ -203,7 +208,7 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                 if user_info and "subscription_url" in user_info:
                     token = user_info["subscription_url"].split("/")[-2]
                     await save_user_token(telegram_id, token, username)
-                    await order_service.update_order(order_id, {"status": "confirmed"})
+                    await update_order(order_id, {"status": "confirmed"})
                     await bot.send_message(
                         telegram_id,
                         f"""
@@ -224,7 +229,7 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                     )
                     await callback.answer("سفارش تأیید شد و اکانت برای کاربر ایجاد شد!")
                 else:
-                    order_logger.error(
+                    logger.error(
                         f"Failed to create user for order {order_id}: {user_info}"
                     )
                     await callback.answer(
@@ -232,11 +237,11 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                         show_alert=True,
                     )
         except Exception as e:
-            order_logger.error(f"Failed to confirm order {order_id}: {e}")
+            logger.error(f"Failed to confirm order {order_id}: {e}")
             await callback.answer(f"❌ خطا در تأیید سفارش: {str(e)}", show_alert=True)
     else:  # reject
         try:
-            await order_service.update_order(order_id, {"status": "rejected"})
+            await update_order(order_id, {"status": "rejected"})
             await bot.send_message(
                 telegram_id,
                 f"{'تمدید' if is_renewal else 'سفارش'} *{order_id}* توسط ادمین رد شد. 😔",
@@ -248,5 +253,5 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
             )
             await callback.answer("سفارش رد شد!")
         except Exception as e:
-            order_logger.error(f"Failed to reject order {order_id}: {e}")
+            logger.error(f"Failed to reject order {order_id}: {e}")
             await callback.answer(f"❌ خطا در رد سفارش: {str(e)}", show_alert=True)
