@@ -59,6 +59,26 @@ def get_main_menu():
     return keyboard
 
 
+def get_main_menu_inline():
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📊 وضعیت اکانت", callback_data="main_status"
+                ),
+                InlineKeyboardButton(text="🛒 خرید اکانت", callback_data="main_buy"),
+            ],
+            [
+                InlineKeyboardButton(text="🔄 تمدید اکانت", callback_data="main_renew"),
+                InlineKeyboardButton(
+                    text="🔗 دریافت لینک", callback_data="main_getlink"
+                ),
+            ],
+        ]
+    )
+    return keyboard
+
+
 def save_user_token(telegram_id: int, token: str, username: str):
     try:
         response = requests.post(
@@ -545,7 +565,9 @@ async def servers_command(message: types.Message):
 async def buy_command(message: types.Message):
     user_id = message.from_user.id
     if not await check_channel_membership(user_id):
-        await message.reply(f"لطفاً ابتدا در کانال ما عضو شوید: {CHANNEL_ID}")
+        await message.reply(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}", parse_mode="Markdown"
+        )
         return
 
     keyboard = InlineKeyboardMarkup(
@@ -557,14 +579,45 @@ async def buy_command(message: types.Message):
                 )
             ],
             [InlineKeyboardButton(text="🧪 اکانت تست", callback_data="buy_test")],
-            [InlineKeyboardButton(text="⬅️ بازگشت", callback_data="back_to_main")],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ بازگشت به منوی اصلی", callback_data="back_to_main"
+                )
+            ],
         ]
     )
     await message.reply(
+        "*لطفاً نوع اکانت را انتخاب کنید:*", parse_mode="Markdown", reply_markup=keyboard
+    )
+
+
+@dp.callback_query(lambda c: c.data == "buy_back")
+async def buy_back(callback: CallbackQuery):
+    await callback.message.edit_text(
         "*لطفاً نوع اکانت را انتخاب کنید:*",
         parse_mode="Markdown",
-        reply_markup=keyboard,
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="📈 اکانت حجمی", callback_data="buy_volume"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="♾️ اکانت نامحدود", callback_data="buy_unlimited"
+                    )
+                ],
+                [InlineKeyboardButton(text="🧪 اکانت تست", callback_data="buy_test")],
+                [
+                    InlineKeyboardButton(
+                        text="⬅️ بازگشت به منوی اصلی", callback_data="back_to_main"
+                    )
+                ],
+            ]
+        ),
     )
+    await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data == "back_to_main")
@@ -572,7 +625,7 @@ async def back_to_main(callback: CallbackQuery):
     await callback.message.edit_text(
         "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
         parse_mode="Markdown",
-        reply_markup=get_main_menu(),
+        reply_markup=get_main_menu_inline(),
     )
     await callback.answer()
 
@@ -661,28 +714,6 @@ async def process_plan_selection(callback: types.CallbackQuery):
         f"لطفاً مبلغ را به شماره کارت زیر واریز کنید و رسید را ظرف 30 دقیقه ارسال کنید:\n"
         f"شماره کارت: {CARD_NUMBER} (به نام {CARD_HOLDER})\n\n"
         f"برای ارسال رسید، کافیست عکس رسید را در همین چت بفرستید."
-    )
-    await callback.answer()
-
-
-@dp.callback_query(lambda c: c.data == "buy_back")
-async def buy_back(callback: CallbackQuery):
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="📈 اکانت حجمی", callback_data="buy_volume")],
-            [
-                InlineKeyboardButton(
-                    text="♾️ اکانت نامحدود", callback_data="buy_unlimited"
-                )
-            ],
-            [InlineKeyboardButton(text="🧪 اکانت تست", callback_data="buy_test")],
-            [InlineKeyboardButton(text="⬅️ بازگشت", callback_data="back_to_main")],
-        ]
-    )
-    await callback.message.edit_text(
-        "*لطفاً نوع اکانت را انتخاب کنید:*",
-        parse_mode="Markdown",
-        reply_markup=keyboard,
     )
     await callback.answer()
 
