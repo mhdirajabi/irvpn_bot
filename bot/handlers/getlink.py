@@ -1,0 +1,89 @@
+from aiogram import Bot, Router
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command, Text
+from aiogram.types import CallbackQuery, Message
+from config import CHANNEL_ID
+from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
+from services.api_client import APIClient
+from services.check_channel_membership import check_channel_membership
+from services.user_service import get_user_by_telegram_id
+from utils.logger import logger
+
+router = Router()
+
+
+@router.message(Command("getlink"))
+@router.message(Text("🔗 دریافت لینک"))
+async def getlink_command(message: Message, bot: Bot):
+    user_id = message.from_user.id
+    if not await check_channel_membership(bot, user_id):
+        await message.reply(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
+            parse_mode="Markdown",
+            reply_markup=get_channel_join_keyboard(),
+        )
+        return
+    try:
+        user = await get_user_by_telegram_id(user_id)
+        if not user or not user.get("subscription_url"):
+            await message.answer(
+                "⚠️ *لینکی برای اکانت شما پیدا نشد!*",
+                parse_mode="Markdown",
+                reply_markup=get_main_menu(),
+            )
+            return
+        await message.answer(
+            f"*لینک اشتراک شما:* 🔗\n`{user['subscription_url']}`",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch link for telegram_id={user_id}: {e}")
+        await message.answer(
+            "❌ *خطا در دریافت لینک اشتراک!*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+
+
+@router.callback_query(lambda c: c.data == "main_getlink")
+async def main_getlink(callback: CallbackQuery, bot: Bot):
+    logger.debug(f"Received callback: main_getlink from user {callback.from_user.id}")
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in main_getlink: {str(e)}")
+    message = callback.message
+    message.from_user = callback.from_user
+    await getlink_command(message, bot)
+    await callback.answer()
+
+
+@router.callback_query(lambda c: c.data.startswith("getlink_"))
+async def process_client_type(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    if not await check_channel_membership(user_id):
+        await callback.message.reply(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}", parse_mode="Markdown"
+        )
+        return
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in process_client_type: {str(e)}")
+    client_type, token = callback.data.split("_")[1:3]
+    try:
+        response = await APIClient.get(f"/sub/{token}/{client_type}")
+        await callback.message.answer(
+            f"*لینک اشتراک ({client_type}):*\n`{response}`",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch client link for token={token}: {e}")
+        await callback.message.answer(
+            "❌ *خطا در دریافت لینک اشتراک!*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+    await callback.answer()

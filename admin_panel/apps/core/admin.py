@@ -8,15 +8,13 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = ("status",)
     actions = ["verify_payment", "reject_payment"]
 
+    @admin.action(description="تأیید پرداخت")
     def verify_payment(self, request, queryset):
         queryset.update(status="verified")
 
-    verify_payment.short_description = "تأیید پرداخت"
-
+    @admin.action(description="رد پرداخت")
     def reject_payment(self, request, queryset):
         queryset.update(status="rejected")
-
-    reject_payment.short_description = "رد پرداخت"
 
 
 admin.site.register(User)

@@ -47,18 +47,18 @@ class OrderSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["created_at"]
 
-    def validate(self, data):
-        logger.debug(f"Validating order data: {data}")
-        if not isinstance(data.get("telegram_id"), int):
-            logger.error(f"Invalid telegram_id type: {type(data.get('telegram_id'))}")
+    def validate(self, attrs):
+        logger.debug(f"Validating order data: {attrs}")
+        if not isinstance(attrs.get("telegram_id"), int):
+            logger.error(f"Invalid telegram_id type: {type(attrs.get('telegram_id'))}")
             raise serializers.ValidationError("telegram_id must be an integer")
-        if "status" in data and data["status"] not in [
+        if "status" in attrs and attrs["status"] not in [
             "pending",
             "confirmed",
             "rejected",
         ]:
-            logger.error(f"Invalid status: {data['status']}")
+            logger.error(f"Invalid status: {attrs['status']}")
             raise serializers.ValidationError(
                 "Status must be 'pending', 'confirmed', or 'rejected'"
             )
-        return data
+        return attrs
