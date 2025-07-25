@@ -375,6 +375,62 @@ async def check_expiring_users():
         await asyncio.sleep(3600)
 
 
+@dp.callback_query(lambda c: c.data == "main_status")
+async def main_status(callback: CallbackQuery):
+    logger.debug(f"Received callback: main_status from user {callback.from_user.id}")
+    try:
+        await callback.message.delete()
+        await status_command(callback.message)
+    except Exception as e:
+        logger.error(f"Error in main_status: {str(e)}")
+        await callback.message.answer(
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+        )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data == "main_buy")
+async def main_buy(callback: CallbackQuery):
+    logger.debug(f"Received callback: main_buy from user {callback.from_user.id}")
+    try:
+        await callback.message.delete()
+        await buy_command(callback.message)
+    except Exception as e:
+        logger.error(f"Error in main_buy: {str(e)}")
+        await callback.message.answer(
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+        )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data == "main_renew")
+async def main_renew(callback: CallbackQuery):
+    logger.debug(f"Received callback: main_renew from user {callback.from_user.id}")
+    try:
+        await callback.message.delete()
+        await renew_command(callback.message)
+    except Exception as e:
+        logger.error(f"Error in main_renew: {str(e)}")
+        await callback.message.answer(
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+        )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data == "main_getlink")
+async def main_getlink(callback: CallbackQuery):
+    logger.debug(f"Received callback: main_getlink from user {callback.from_user.id}")
+    try:
+        await callback.message.delete()
+        await getlink_command(callback.message)
+    except Exception as e:
+        logger.error(f"Error in main_getlink: {str(e)}")
+        await callback.message.answer(
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+        )
+    await callback.answer()
+
+
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
     user_id = message.from_user.id
@@ -593,40 +649,60 @@ async def buy_command(message: types.Message):
 
 @dp.callback_query(lambda c: c.data == "buy_back")
 async def buy_back(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "*لطفاً نوع اکانت را انتخاب کنید:*",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="📈 اکانت حجمی", callback_data="buy_volume"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="♾️ اکانت نامحدود", callback_data="buy_unlimited"
-                    )
-                ],
-                [InlineKeyboardButton(text="🧪 اکانت تست", callback_data="buy_test")],
-                [
-                    InlineKeyboardButton(
-                        text="⬅️ بازگشت به منوی اصلی", callback_data="back_to_main"
-                    )
-                ],
-            ]
-        ),
-    )
+    logger.debug(f"Received callback: buy_back from user {callback.from_user.id}")
+    try:
+        await callback.message.delete()
+        await callback.message.answer(
+            "*لطفاً نوع اکانت را انتخاب کنید:*",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="📈 اکانت حجمی", callback_data="buy_volume"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="♾️ اکانت نامحدود", callback_data="buy_unlimited"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🧪 اکانت تست", callback_data="buy_test"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="⬅️ بازگشت به منوی اصلی", callback_data="back_to_main"
+                        )
+                    ],
+                ]
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error in buy_back: {str(e)}")
+        await callback.message.answer(
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+        )
     await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data == "back_to_main")
 async def back_to_main(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
-        parse_mode="Markdown",
-        reply_markup=get_main_menu_inline(),
-    )
+    logger.debug(f"Received callback: back_to_main from user {callback.from_user.id}")
+    try:
+        await callback.message.delete()  # پیام قبلی رو پاک می‌کنیم
+        await callback.message.answer(
+            "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_inline(),
+        )
+    except Exception as e:
+        logger.error(f"Error in back_to_main: {str(e)}")
+        await callback.message.answer(
+            "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*", parse_mode="Markdown"
+        )
     await callback.answer()
 
 
