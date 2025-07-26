@@ -80,17 +80,18 @@ async def handle_receipt(message: Message, bot: Bot):
             f"📥 *رسید پرداخت برای* {'*تمدید*' if is_renewal else '*سفارش*'} {order_id} *:* \n"
             f"👤 *کاربر*: {user_id}\n"
             f"📦 *پلن*: {plan['name']}\n"
-            f"📈 *حجم*: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
-            f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
-            f"💸 *مبلغ*: {plan['price']} تومان\n"
-            f"🔗 *لینک رسید*: {receipt_url.replace('.', '\\.').replace('/', '\\/')}"
+            f"💸 *مبلغ*: {plan['price']} تومان"
         )
+        logger.debug(f"Caption length: {len(caption.encode('utf-8'))} bytes")
         receipt_message = await bot.send_photo(
             ADMIN_TELEGRAM_ID,
             photo=message.photo[-1].file_id,
             caption=caption,
             parse_mode="Markdown",
             reply_markup=get_receipt_admin_menu(order_id),
+        )
+        await bot.send_message(
+            ADMIN_TELEGRAM_ID, f"🔗 *لینک رسید*: {receipt_url}", parse_mode="Markdown"
         )
         logger.info(
             f"Receipt sent to admin for order {order_id}, message_id: {receipt_message.message_id}"
