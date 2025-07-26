@@ -43,23 +43,49 @@ class UserListCreateView(APIView):
         logger.error(f"Failed to create user in Django: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+class UserUpdateView(APIView):
+    def get(self, request, username):
+        logger.debug(f"Fetching user {username}")
+        try:
+            user = User.objects.get(username=username)
+            serializer = UserSerializer(user)
+            logger.info(f"User {username} fetched: {serializer.data}")
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            logger.error(f"User not found: {username}")
+            return Response(
+                {"error": f"User with username {username} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            logger.error(f"Error fetching user {username}: {str(e)}")
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def put(self, request, username):
         logger.debug(f"Updating user {username} with data: {request.data}")
         try:
             user = User.objects.get(username=username)
+            serializer = UserSerializer(user, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                logger.info(f"User {username} updated: {serializer.data}")
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            logger.error(f"Invalid data for user {username}: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except User.DoesNotExist:
-            logger.error(f"User {username} not found in Django")
+            logger.error(f"User not found: {username}")
             return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": f"User with username {username} not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
-
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            logger.info(f"User {username} updated in Django")
-            return Response(serializer.data)
-        logger.error(f"Failed to update user {username} in Django: {serializer.errors}")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error updating user {username}: {str(e)}")
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class OrderListCreateView(APIView):

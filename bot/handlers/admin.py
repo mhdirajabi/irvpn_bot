@@ -5,7 +5,7 @@ from config import ADMIN_TELEGRAM_ID, API_BASE_URL, CHANNEL_ID
 from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
 from services.api_client import APIClient
 from services.check_channel_membership import check_channel_membership
-from services.user_service import create_user, save_user_token
+from services.user_service import create_user
 from utils.logger import logger
 from utils.marzban import get_jwt_token
 
@@ -65,10 +65,8 @@ async def adduser_command(message: Message, bot: Bot):
             user_id, username, int(data_limit), int(expire_days), users
         )
         if user_info:
-            token = user_info["subscription_url"].split("/")[-2]
-            await save_user_token(user_id, token, username)
             await message.reply(
-                f"کاربر *{username}* با موفقیت ایجاد شد! 🎉\n" f"🔗 *Token*: `{token}`",
+                f"کاربر *{username}* با موفقیت ایجاد شد! 🎉",
                 parse_mode="Markdown",
                 reply_markup=get_main_menu(),
             )

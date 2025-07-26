@@ -7,7 +7,7 @@ from utils.logger import logger
 from utils.marzban import get_jwt_token
 
 
-async def get_subscription_info(token: str):
+async def get_subscription_info(token: str) -> Optional[dict]:
     try:
         response = await APIClient.get(f"/sub/{token}/info", base_url=API_BASE_URL)
         return response
@@ -28,14 +28,13 @@ async def get_user_by_telegram_id(telegram_id: Optional[int]) -> Optional[dict]:
                 base_url=DJANGO_API_URL,
             )
             if users and isinstance(users, list) and len(users) > 0:
-                return users[0]
+                user = users[0]
+                return user
             else:
                 logger.warning(f"No user found for telegram_id={telegram_id}")
-
                 return None
         except Exception as e:
             logger.error(f"Failed to fetch user by telegram_id={telegram_id}: {e}")
-
             return None
 
 
@@ -48,37 +47,6 @@ async def get_user_data(telegram_id: int) -> tuple:
     except Exception as e:
         logger.error(f"Failed to fetch user data for telegram_id={telegram_id}: {e}")
         return (None, None)
-
-
-async def save_user_token(telegram_id: int, token: str, username: str):
-    try:
-        user = await get_user_by_telegram_id(telegram_id)
-        payload = {
-            "telegram_id": telegram_id,
-            "subscription_token": token,
-            "username": username,
-        }
-        if user:
-            await APIClient.put(
-                f"/users/{user['telegram_id']}/",
-                payload,
-                base_url=DJANGO_API_URL,
-            )
-            logger.info(
-                f"User token updated for telegram_id={telegram_id}, user_id={user['id']}"
-            )
-        else:
-            response = await APIClient.post(
-                "/users/",
-                payload,
-                base_url=DJANGO_API_URL,
-            )
-            logger.info(
-                f"User token saved for telegram_id={telegram_id}, username={username}, response={response}"
-            )
-    except Exception as e:
-        logger.error(f"Failed to save user token for telegram_id={telegram_id}: {e}")
-        raise
 
 
 async def create_user(
@@ -131,7 +99,7 @@ async def create_user(
                 }
                 if existing_user:
                     await APIClient.put(
-                        f"/users/{existing_user['telegram_id']}/",
+                        f"/users/{username}/",
                         django_payload,
                         base_url=DJANGO_API_URL,
                     )
@@ -199,7 +167,7 @@ async def renew_user(
                 }
                 if existing_user:
                     await APIClient.put(
-                        f"/users/{existing_user['telegram_id']}/",
+                        f"/users/{username}/",
                         django_payload,
                         base_url=DJANGO_API_URL,
                     )

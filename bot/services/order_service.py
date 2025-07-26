@@ -3,6 +3,16 @@ from services.api_client import APIClient
 from utils.logger import logger
 
 
+async def get_order(order_id: str):
+    try:
+        response = await APIClient.get(f"/orders/{order_id}/", base_url=DJANGO_API_URL)
+        logger.info(f"Order {order_id} fetched: {response}")
+        return response
+    except Exception as e:
+        logger.error(f"Failed to fetch order {order_id}: {e}")
+        raise
+
+
 async def save_order(
     telegram_id: int, order_id: str, plan_id: str, price: int, is_renewal: bool = False
 ):
@@ -36,14 +46,16 @@ async def update_order(order_id: str, data: dict):
         raise
 
 
-async def get_order(order_id: str):
+async def get_orders(telegram_id: int):
     try:
-        response = await APIClient.get(f"/orders/{order_id}/", base_url=DJANGO_API_URL)
-        logger.info(f"Order {order_id} fetched: {response}")
-        return response
+        orders = await APIClient.get(
+            "/orders/", params={"telegram_id": telegram_id}, base_url=DJANGO_API_URL
+        )
+        logger.info(f"Orders fetched for telegram_id={telegram_id}: {orders}")
+        return orders
     except Exception as e:
-        logger.error(f"Failed to fetch order {order_id}: {e}")
-        raise
+        logger.error(f"Failed to fetch orders for telegram_id={telegram_id}: {e}")
+        return []
 
 
 async def get_pending_orders(telegram_id: int):
@@ -59,16 +71,4 @@ async def get_pending_orders(telegram_id: int):
         logger.error(
             f"Failed to fetch pending orders for telegram_id={telegram_id}: {e}"
         )
-        return []
-
-
-async def get_orders(telegram_id: int):
-    try:
-        orders = await APIClient.get(
-            "/orders/", params={"telegram_id": telegram_id}, base_url=DJANGO_API_URL
-        )
-        logger.info(f"Orders fetched for telegram_id={telegram_id}: {orders}")
-        return orders
-    except Exception as e:
-        logger.error(f"Failed to fetch orders for telegram_id={telegram_id}: {e}")
         return []

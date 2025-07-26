@@ -17,7 +17,6 @@ from services.user_service import (
     create_user,
     get_user_by_telegram_id,
     renew_user,
-    save_user_token,
 )
 from utils.logger import logger
 from utils.plans import get_plan_by_id
@@ -187,9 +186,7 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                         users,
                     )
 
-                if user_info and "subscription_url" in user_info:
-                    token = user_info["subscription_url"].split("/")[-2]
-                    await save_user_token(telegram_id, token, username)
+                if user_info:
                     await update_order(
                         order_id, {"status": "confirmed", "telegram_id": telegram_id}
                     )

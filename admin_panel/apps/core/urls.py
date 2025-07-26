@@ -6,11 +6,12 @@ from .views import (
     ReceiptUploadView,
     ReportView,
     UserListCreateView,
+    UserUpdateView,
 )
 
 urlpatterns = [
     path("users/", UserListCreateView.as_view(), name="user-list-create"),
-    path("users/<int:telegram_id>/", UserListCreateView.as_view(), name="user-update"),
+    path("users/<str:username>/", UserUpdateView.as_view(), name="user-update"),
     path("orders/", OrderListCreateView.as_view(), name="order-list-create"),
     path("orders/<str:order_id>/", OrderUpdateView.as_view(), name="order-update"),
     path("receipts/", ReceiptUploadView.as_view(), name="receipt-upload"),

@@ -9,7 +9,6 @@ from keyboards.main_menu import (
     get_main_menu_inline,
 )
 from services.check_channel_membership import check_channel_membership
-from services.user_service import get_subscription_info, save_user_token
 from utils.logger import logger
 
 router = Router()
@@ -47,40 +46,6 @@ async def start_command(message: Message, bot: Bot):
         "🔗 *دریافت لینک*: دریافت لینک اشتراک"
     )
     await message.reply(reply, parse_mode="Markdown", reply_markup=get_main_menu())
-
-
-@router.message(Command("settoken"))
-async def settoken_command(message: Message, bot: Bot):
-    if message.from_user is None:
-        await message.reply("خطا: کاربر شناسایی نشد. لطفاً دوباره تلاش کنید.")
-        return
-    user_id = message.from_user.id
-    if not await check_channel_membership(bot, user_id):
-        await message.reply(f"لطفاً ابتدا در کانال ما عضو شوید: {CHANNEL_ID}")
-        return
-
-    if not message.text:
-        await message.reply(
-            "لطفاً کد اشتراک (token) رو وارد کنید:\n/settoken <your_token>"
-        )
-        return
-
-    args = message.text.split()
-    if len(args) < 2:
-        await message.reply(
-            "لطفاً کد اشتراک (token) رو وارد کنید:\n/settoken <your_token>"
-        )
-        return
-
-    token = args[1]
-    user_info = await get_subscription_info(token)
-    if user_info:
-        await save_user_token(user_id, token, user_info["username"])
-        await message.reply(
-            "کد اشتراک ذخیره شد! حالا می‌تونی از /status یا /getlink استفاده کنی."
-        )
-    else:
-        await message.reply("کد اشتراک نامعتبره! لطفاً دوباره امتحان کن.")
 
 
 @router.callback_query(lambda c: c.data == "check_membership")
