@@ -27,7 +27,7 @@ router = Router()
 
 @router.message(F.photo)
 async def handle_receipt(message: Message, bot: Bot):
-    user_id = message.from_user.id
+    user_id = str(message.from_user.id)
     logger.info(f"Handling receipt for user: {user_id}")
     if not await check_channel_membership(bot, user_id):
         logger.warning(f"User {user_id} not in channel {CHANNEL_ID}")
@@ -77,10 +77,10 @@ async def handle_receipt(message: Message, bot: Bot):
         file = await bot.get_file(message.photo[-1].file_id)
         receipt_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
         caption = (
-            f"📥 رسید پرداخت برای سفارش {order_id}:\n"
-            f"👤 کاربر: {user_id}\n"
-            f"📦 پلن: {plan['name']}\n"
-            f"💸 مبلغ: {plan['price']} تومان"
+            f"رسید پرداخت برای سفارش {order_id}: \n"
+            f"کاربر: {user_id}\n"
+            f"پلن: {plan['name']}\n"
+            f"مبلغ: {plan['price']} تومان"
         )
         logger.debug(
             f"Caption: {caption}, Length: {len(caption.encode('utf-8'))} bytes"
@@ -89,11 +89,13 @@ async def handle_receipt(message: Message, bot: Bot):
             ADMIN_TELEGRAM_ID,
             photo=message.photo[-1].file_id,
             caption=caption,
-            parse_mode="Markdown",
+            # حذف parse_mode="Markdown"
             reply_markup=get_receipt_admin_menu(order_id),
         )
         await bot.send_message(
-            ADMIN_TELEGRAM_ID, f"🔗 *لینک رسید*: {receipt_url}", parse_mode="Markdown"
+            ADMIN_TELEGRAM_ID,
+            f"لینک رسید: {receipt_url}",
+            # حذف parse_mode="Markdown"
         )
         logger.info(
             f"Receipt sent to admin for order {order_id}, message_id: {receipt_message.message_id}"
@@ -108,15 +110,13 @@ async def handle_receipt(message: Message, bot: Bot):
             },
         )
         await message.reply(
-            "✅ *رسید شما برای ادمین ارسال شد! منتظر تأیید باشید.*",
-            parse_mode="Markdown",
+            "رسید شما برای ادمین ارسال شد! منتظر تأیید باشید.",
             reply_markup=get_main_menu(),
         )
     except Exception as e:
         logger.error(f"Failed to process receipt for order {order_id}: {e}")
         await message.reply(
-            f"❌ *خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.*: {str(e)}",
-            parse_mode="Markdown",
+            f"خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.: {str(e)}",
             reply_markup=get_main_menu(),
         )
 

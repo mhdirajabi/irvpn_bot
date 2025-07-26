@@ -68,7 +68,7 @@ async def process_buy_type(callback: CallbackQuery, bot: Bot):
     logger.info(
         f"Received buy callback: {callback.data} from user {callback.from_user.id}"
     )
-    user_id = str(callback.from_user.id)
+    user_id = callback.from_user.id
     if not await check_channel_membership(bot, user_id):
         await callback.message.answer(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",

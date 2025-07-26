@@ -60,9 +60,9 @@ async def main_getlink(callback: CallbackQuery, bot: Bot):
 
 
 @router.callback_query(lambda c: c.data.startswith("getlink_"))
-async def process_client_type(callback: CallbackQuery):
+async def process_client_type(callback: CallbackQuery, bot: Bot):
     user_id = callback.from_user.id
-    if not await check_channel_membership(user_id):
+    if not await check_channel_membership(bot, user_id):
         await callback.message.reply(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}", parse_mode="Markdown"
         )

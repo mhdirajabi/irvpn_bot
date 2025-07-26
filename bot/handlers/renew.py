@@ -19,7 +19,7 @@ router = Router()
 @router.message(Command("renew"))
 @router.message(F.text == "🔄 تمدید اکانت")
 async def renew_command(message: Message, bot: Bot):
-    user_id = str(message.from_user.id)
+    user_id = message.from_user.id
     logger.info(f"Renew command received from user {user_id}")
     if not await check_channel_membership(bot, user_id):
         await message.reply(
@@ -50,7 +50,7 @@ async def main_renew(callback: CallbackQuery, bot: Bot):
         await callback.message.delete()
     except TelegramBadRequest as e:
         logger.warning(f"Failed to delete message in main_renew: {e}")
-    user_id = str(callback.from_user.id)
+    user_id = callback.from_user.id
     if not await check_channel_membership(bot, user_id):
         await callback.message.answer(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
@@ -81,7 +81,7 @@ async def process_renew_type(callback: CallbackQuery, bot: Bot):
     logger.info(
         f"Received renew callback: {callback.data} from user {callback.from_user.id}"
     )
-    user_id = str(callback.from_user.id)
+    user_id = callback.from_user.id
     if not await check_channel_membership(bot, user_id):
         await callback.message.answer(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
@@ -116,7 +116,7 @@ async def process_renew_plan_selection(callback: CallbackQuery, bot: Bot):
     logger.info(
         f"Received renewselect callback: {callback.data} from user {callback.from_user.id}"
     )
-    user_id = str(callback.from_user.id)
+    user_id = callback.from_user.id
     if not await check_channel_membership(bot, user_id):
         await callback.message.answer(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
