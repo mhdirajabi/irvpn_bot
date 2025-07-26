@@ -17,27 +17,29 @@ async def get_subscription_info(token: str):
 
 
 async def get_user_by_telegram_id(telegram_id: Optional[int]) -> Optional[dict]:
+    if telegram_id is None:
+        logger.error("telegram_id is None")
+        return None
     try:
         users = await APIClient.get(
             "/users/",
             params={"telegram_id": telegram_id},
             base_url=DJANGO_API_URL,
         )
-        return users[0] if users else None
+        if users and isinstance(users, list) and len(users) > 0:
+            return users[0]
+        logger.warning(f"No user found for telegram_id={telegram_id}")
+        return None
     except Exception as e:
         logger.error(f"Failed to fetch user by telegram_id={telegram_id}: {e}")
-        raise
+        return None
 
 
 async def get_user_data(telegram_id: int) -> tuple:
     try:
-        users = await APIClient.get(
-            "/users/",
-            params={"telegram_id": telegram_id},
-            base_url=DJANGO_API_URL,
-        )
-        if users:
-            return (users[0]["subscription_token"], users[0]["username"])
+        user = await get_user_by_telegram_id(telegram_id)
+        if user:
+            return (user.get("subscription_token"), user.get("username"))
         return (None, None)
     except Exception as e:
         logger.error(f"Failed to fetch user data for telegram_id={telegram_id}: {e}")
@@ -47,31 +49,28 @@ async def get_user_data(telegram_id: int) -> tuple:
 async def save_user_token(telegram_id: int, token: str, username: str):
     try:
         user = await get_user_by_telegram_id(telegram_id)
-        if user:
+        payload = {
+            "telegram_id": telegram_id,
+            "subscription_token": token,
+            "username": username,
+        }
+        if user and user.get("id"):
             await APIClient.put(
                 f"/users/{user['id']}/",
-                {
-                    "telegram_id": telegram_id,
-                    "subscription_token": token,
-                    "username": username,
-                },
+                payload,
                 base_url=DJANGO_API_URL,
             )
             logger.info(
                 f"User token updated for telegram_id={telegram_id}, user_id={user['id']}"
             )
         else:
-            await APIClient.post(
+            response = await APIClient.post(
                 "/users/",
-                {
-                    "telegram_id": telegram_id,
-                    "subscription_token": token,
-                    "username": username,
-                },
+                payload,
                 base_url=DJANGO_API_URL,
             )
             logger.info(
-                f"User token saved for telegram_id={telegram_id}, username={username}"
+                f"User token saved for telegram_id={telegram_id}, username={username}, response={response}"
             )
     except Exception as e:
         logger.error(f"Failed to save user token for telegram_id={telegram_id}: {e}")
@@ -114,31 +113,34 @@ async def create_user(
             "/api/user", payload, headers=headers, base_url=API_BASE_URL
         )
         logger.info(f"User {username} created successfully: {user_info}")
-        try:
-            existing_user = await get_user_by_telegram_id(telegram_id)
-            django_payload = {
-                "telegram_id": telegram_id,
-                "username": username,
-                "data_limit": data_limit,
-                "expire": expire_timestamp,
-                "status": "active",
-                "data_limit_reset_strategy": "no_reset",
-                "subscription_url": user_info.get("subscription_url", ""),
-            }
-            if existing_user:
-                await APIClient.put(
-                    f"/users/{existing_user['id']}/",
-                    django_payload,
-                    base_url=DJANGO_API_URL,
-                )
-                logger.info(
-                    f"User {username} updated in Django with id={existing_user['id']}"
-                )
-            else:
-                await APIClient.post("/users/", django_payload, base_url=DJANGO_API_URL)
-                logger.info(f"User {username} saved in Django")
-        except Exception as e:
-            logger.error(f"Failed to save user {username} in Django: {e}")
+        if telegram_id:
+            try:
+                existing_user = await get_user_by_telegram_id(telegram_id)
+                django_payload = {
+                    "telegram_id": telegram_id,
+                    "username": username,
+                    "data_limit": data_limit,
+                    "expire": expire_timestamp,
+                    "status": "active",
+                    "data_limit_reset_strategy": "no_reset",
+                    "subscription_url": user_info.get("subscription_url", ""),
+                }
+                if existing_user and existing_user.get("id"):
+                    await APIClient.put(
+                        f"/users/{existing_user['id']}/",
+                        django_payload,
+                        base_url=DJANGO_API_URL,
+                    )
+                    logger.info(
+                        f"User {username} updated in Django with id={existing_user['id']}"
+                    )
+                else:
+                    response = await APIClient.post(
+                        "/users/", django_payload, base_url=DJANGO_API_URL
+                    )
+                    logger.info(f"User {username} saved in Django: {response}")
+            except Exception as e:
+                logger.error(f"Failed to save user {username} in Django: {e}")
         return user_info
     except Exception as e:
         logger.error(f"Failed to create user {username}: {e}")
@@ -179,28 +181,34 @@ async def renew_user(
             f"/api/user/{username}", payload, headers=headers, base_url=API_BASE_URL
         )
         logger.info(f"User {username} renewed successfully: {user_info}")
-        try:
-            existing_user = await get_user_by_telegram_id(telegram_id)
-            django_payload = {
-                "telegram_id": telegram_id,
-                "username": username,
-                "data_limit": data_limit,
-                "expire": expire_timestamp,
-                "status": "active",
-                "data_limit_reset_strategy": "no_reset",
-                "subscription_url": user_info.get("subscription_url", ""),
-            }
-            if existing_user:
-                await APIClient.put(
-                    f"/users/{existing_user['id']}/",
-                    django_payload,
-                    base_url=DJANGO_API_URL,
-                )
-                logger.info(
-                    f"User {username} updated in Django with id={existing_user['id']}"
-                )
-        except Exception as e:
-            logger.error(f"Failed to update user {username} in Django: {e}")
+        if telegram_id:
+            try:
+                existing_user = await get_user_by_telegram_id(telegram_id)
+                django_payload = {
+                    "telegram_id": telegram_id,
+                    "username": username,
+                    "data_limit": data_limit,
+                    "expire": expire_timestamp,
+                    "status": "active",
+                    "data_limit_reset_strategy": "no_reset",
+                    "subscription_url": user_info.get("subscription_url", ""),
+                }
+                if existing_user and existing_user.get("id"):
+                    await APIClient.put(
+                        f"/users/{existing_user['id']}/",
+                        django_payload,
+                        base_url=DJANGO_API_URL,
+                    )
+                    logger.info(
+                        f"User {username} updated in Django with id={existing_user['id']}"
+                    )
+                else:
+                    response = await APIClient.post(
+                        "/users/", django_payload, base_url=DJANGO_API_URL
+                    )
+                    logger.info(f"User {username} saved in Django: {response}")
+            except Exception as e:
+                logger.error(f"Failed to update user {username} in Django: {e}")
         return user_info
     except Exception as e:
         logger.error(f"Failed to renew user {username}: {e}")

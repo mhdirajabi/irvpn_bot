@@ -19,25 +19,30 @@ async def check_pending_orders(bot):
             now = datetime.now(ZoneInfo("UTC"))
             for order in orders:
                 try:
+                    telegram_id = order.get("telegram_id")
+                    if not telegram_id or not isinstance(telegram_id, int):
+                        logger.error(f"Invalid or missing telegram_id for order {order.get('order_id', 'unknown')}")
+                        continue
                     created_time = datetime.fromisoformat(
                         order["created_at"].replace("Z", "+00:00")
                     )
                     if now - created_time > timedelta(minutes=30):
                         try:
                             await update_order(
-                                order["order_id"], {"status": "rejected"}
+                                order["order_id"], 
+                                {"status": "rejected", "telegram_id": telegram_id}
                             )
                             await bot.send_message(
-                                order["telegram_id"],
+                                telegram_id,
                                 f"سفارش *{order['order_id']}* به دلیل عدم ارسال رسید در 30 دقیقه لغو شد.",
                                 parse_mode="Markdown",
                             )
                             logger.info(
-                                f"Order {order['order_id']} rejected and user {order['telegram_id']} notified"
+                                f"Order {order['order_id']} rejected and user {telegram_id} notified"
                             )
                         except Exception as e:
                             logger.error(
-                                f"Failed to reject order {order['order_id']} or notify user {order['telegram_id']}: {e}"
+                                f"Failed to reject order {order['order_id']} or notify user {telegram_id}: {e}"
                             )
                 except Exception as e:
                     logger.error(
@@ -57,21 +62,27 @@ async def check_expiring_users(bot):
             now = datetime.now(ZoneInfo("UTC"))
             for user in users:
                 try:
+                    telegram_id = user.get("telegram_id")
+                    if not telegram_id or not isinstance(telegram_id, int):
+                        logger.warning(
+                            f"Invalid or missing telegram_id for user {user.get('username', 'unknown')}"
+                        )
+                        continue
                     if "subscription_token" not in user:
                         logger.warning(
-                            f"User {user.get('telegram_id', 'unknown')} has no subscription_token"
+                            f"User {telegram_id} has no subscription_token"
                         )
                         continue
                     token = user["subscription_token"]
                     if not token:
                         logger.debug(
-                            f"Empty subscription_token for user {user.get('telegram_id', 'unknown')}"
+                            f"Empty subscription_token for user {telegram_id}"
                         )
                         continue
                     user_info = await get_subscription_info(token)
                     if not user_info or not user_info.get("expire"):
                         logger.debug(
-                            f"No expiration info for user {user.get('telegram_id', 'unknown')}"
+                            f"No expiration info for user {telegram_id}"
                         )
                         continue
                     expire_time = datetime.fromtimestamp(
@@ -81,17 +92,17 @@ async def check_expiring_users(bot):
                     if days_left in [1, 3, 7]:
                         try:
                             await bot.send_message(
-                                user["telegram_id"],
+                                telegram_id,
                                 f"اکانت شما (*{user['username']}*) {days_left} روز دیگه منقضی می‌شه! "
                                 "برای تمدید از /renew استفاده کنید.",
                                 parse_mode="Markdown",
                             )
                             logger.info(
-                                f"Sent expiration warning to user {user['telegram_id']} ({days_left} days left)"
+                                f"Sent expiration warning to user {telegram_id} ({days_left} days left)"
                             )
                         except Exception as e:
                             logger.error(
-                                f"Failed to send message to user {user['telegram_id']}: {e}"
+                                f"Failed to send message to user {telegram_id}: {e}"
                             )
                 except Exception as e:
                     logger.error(
