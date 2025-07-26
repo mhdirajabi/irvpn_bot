@@ -46,7 +46,7 @@ async def get_order(order_id: str):
         raise
 
 
-async def get_pending_orders(telegram_id: str):
+async def get_pending_orders(telegram_id: int):
     try:
         orders = await APIClient.get(
             "/orders/",
@@ -62,7 +62,7 @@ async def get_pending_orders(telegram_id: str):
         return []
 
 
-async def get_orders(telegram_id: str):
+async def get_orders(telegram_id: int):
     try:
         orders = await APIClient.get(
             "/orders/", params={"telegram_id": telegram_id}, base_url=DJANGO_API_URL

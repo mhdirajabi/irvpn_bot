@@ -20,19 +20,23 @@ async def get_user_by_telegram_id(telegram_id: Optional[int]) -> Optional[dict]:
     if telegram_id is None:
         logger.error("telegram_id is None")
         return None
-    try:
-        users = await APIClient.get(
-            "/users/",
-            params={"telegram_id": telegram_id},
-            base_url=DJANGO_API_URL,
-        )
-        if users and isinstance(users, list) and len(users) > 0:
-            return users[0]
-        logger.warning(f"No user found for telegram_id={telegram_id}")
-        return None
-    except Exception as e:
-        logger.error(f"Failed to fetch user by telegram_id={telegram_id}: {e}")
-        return None
+    else:
+        try:
+            users = await APIClient.get(
+                "/users/",
+                params={"telegram_id": telegram_id},
+                base_url=DJANGO_API_URL,
+            )
+            if users and isinstance(users, list) and len(users) > 0:
+                return users[0]
+            else:
+                logger.warning(f"No user found for telegram_id={telegram_id}")
+
+                return None
+        except Exception as e:
+            logger.error(f"Failed to fetch user by telegram_id={telegram_id}: {e}")
+
+            return None
 
 
 async def get_user_data(telegram_id: int) -> tuple:
@@ -54,9 +58,9 @@ async def save_user_token(telegram_id: int, token: str, username: str):
             "subscription_token": token,
             "username": username,
         }
-        if user and user.get("id"):
+        if user:
             await APIClient.put(
-                f"/users/{user['id']}/",
+                f"/users/{user['telegram_id']}/",
                 payload,
                 base_url=DJANGO_API_URL,
             )
@@ -78,11 +82,11 @@ async def save_user_token(telegram_id: int, token: str, username: str):
 
 
 async def create_user(
+    telegram_id: int,
     username: str,
     data_limit: int,
     expire_days: int,
     users: str,
-    telegram_id: int = None,
 ):
     logger.debug(
         f"Creating user {username} with data_limit={data_limit}, expire_days={expire_days}, users={users}"
@@ -96,7 +100,7 @@ async def create_user(
         if expire_days == 0
         else int((datetime.now() + timedelta(days=expire_days)).timestamp())
     )
-    inbounds = {"vless": ["IR_SV"]}
+    inbounds = {"vless": ["SERVER-KHAREJ"]}
     if users == "double":
         inbounds = {"vless": ["IR_SV", "SERVER-KHAREJ"]}
     payload = {
@@ -125,9 +129,9 @@ async def create_user(
                     "data_limit_reset_strategy": "no_reset",
                     "subscription_url": user_info.get("subscription_url", ""),
                 }
-                if existing_user and existing_user.get("id"):
+                if existing_user:
                     await APIClient.put(
-                        f"/users/{existing_user['id']}/",
+                        f"/users/{existing_user['telegram_id']}/",
                         django_payload,
                         base_url=DJANGO_API_URL,
                     )
@@ -148,11 +152,11 @@ async def create_user(
 
 
 async def renew_user(
+    telegram_id: int,
     username: str,
     data_limit: int,
     expire_days: int,
     users: str,
-    telegram_id: int = None,
 ):
     logger.debug(
         f"Renewing user {username} with data_limit={data_limit}, expire_days={expire_days}, users={users}"
@@ -166,7 +170,7 @@ async def renew_user(
         if expire_days == 0
         else int((datetime.now() + timedelta(days=expire_days)).timestamp())
     )
-    inbounds = {"vless": ["IR_SV"]}
+    inbounds = {"vless": ["SERVER-KHAREJ"]}
     if users == "double":
         inbounds = {"vless": ["IR_SV", "SERVER-KHAREJ"]}
     payload = {
@@ -193,9 +197,9 @@ async def renew_user(
                     "data_limit_reset_strategy": "no_reset",
                     "subscription_url": user_info.get("subscription_url", ""),
                 }
-                if existing_user and existing_user.get("id"):
+                if existing_user:
                     await APIClient.put(
-                        f"/users/{existing_user['id']}/",
+                        f"/users/{existing_user['telegram_id']}/",
                         django_payload,
                         base_url=DJANGO_API_URL,
                     )

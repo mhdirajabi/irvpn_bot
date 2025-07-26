@@ -9,8 +9,6 @@ from services.user_service import create_user, save_user_token
 from utils.logger import logger
 from utils.marzban import get_jwt_token
 
-# from aiogram.exceptions import TelegramBadRequest
-
 
 router = Router()
 
@@ -64,7 +62,7 @@ async def adduser_command(message: Message, bot: Bot):
     try:
         data_limit = float(data_limit) * 1073741824 if data_limit != "0" else 0
         user_info = await create_user(
-            username, int(data_limit), int(expire_days), users, user_id
+            user_id, username, int(data_limit), int(expire_days), users
         )
         if user_info:
             token = user_info["subscription_url"].split("/")[-2]

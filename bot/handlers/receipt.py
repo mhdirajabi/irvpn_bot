@@ -27,8 +27,17 @@ router = Router()
 
 @router.message(F.photo)
 async def handle_receipt(message: Message, bot: Bot):
-    user_id = str(message.from_user.id)
+    if not message.from_user:
+        await message.reply(
+            "❌ *خطا: کاربر نامشخص است!*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+        return
+    user_id = message.from_user.id
+
     logger.info(f"Handling receipt for user: {user_id}")
+
     if not await check_channel_membership(bot, user_id):
         logger.warning(f"User {user_id} not in channel {CHANNEL_ID}")
         await message.reply(
@@ -74,40 +83,43 @@ async def handle_receipt(message: Message, bot: Bot):
         return
 
     try:
-        file = await bot.get_file(message.photo[-1].file_id)
-        receipt_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-        caption = (
-            f"رسید پرداخت برای سفارش {order_id}: \n"
-            f"کاربر: {user_id}\n"
-            f"پلن: {plan['name']}\n"
-            f"مبلغ: {plan['price']} تومان"
-        )
-        logger.debug(
-            f"Caption: {caption}, Length: {len(caption.encode('utf-8'))} bytes"
-        )
-        receipt_message = await bot.send_photo(
-            ADMIN_TELEGRAM_ID,
-            photo=message.photo[-1].file_id,
-            caption=caption,
-            reply_markup=get_receipt_admin_menu(order_id),
-        )
-        await bot.send_message(
-            ADMIN_TELEGRAM_ID,
-            f"لینک رسید: {receipt_url}",
-        )
-        await update_order(
-            order_id,
-            {
-                "receipt_url": receipt_url,
-                "receipt_message_id": receipt_message.message_id,
-                "status": "pending",
-                "telegram_id": int(user_id),
-            },
-        )
-        await message.reply(
-            "رسید شما برای ادمین ارسال شد! منتظر تأیید باشید.",
-            reply_markup=get_main_menu(),
-        )
+        if message.photo:
+            file = await bot.get_file(message.photo[-1].file_id)
+            receipt_url = (
+                f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+            )
+            caption = (
+                f"رسید پرداخت برای سفارش {order_id}: \n"
+                f"کاربر: {user_id}\n"
+                f"پلن: {plan['name']}\n"
+                f"مبلغ: {plan['price']} تومان"
+            )
+            logger.debug(
+                f"Caption: {caption}, Length: {len(caption.encode('utf-8'))} bytes"
+            )
+            receipt_message = await bot.send_photo(
+                ADMIN_TELEGRAM_ID,
+                photo=message.photo[-1].file_id,
+                caption=caption,
+                reply_markup=get_receipt_admin_menu(order_id),
+            )
+            await bot.send_message(
+                ADMIN_TELEGRAM_ID,
+                f"لینک رسید: {receipt_url}",
+            )
+            await update_order(
+                order_id,
+                {
+                    "receipt_url": receipt_url,
+                    "receipt_message_id": receipt_message.message_id,
+                    "status": "pending",
+                    "telegram_id": user_id,
+                },
+            )
+            await message.reply(
+                "رسید شما برای ادمین ارسال شد! منتظر تأیید باشید.",
+                reply_markup=get_main_menu(),
+            )
     except Exception as e:
         logger.error(f"Failed to process receipt for order {order_id}: {e}")
         await message.reply(
@@ -123,115 +135,130 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
             "❌ فقط ادمین می‌تونه این عملیات رو انجام بده!", show_alert=True
         )
         return
+    if callback.data:
+        action, order_id = callback.data.split("_")
 
-    action, order_id = callback.data.split("_")
-    logger.info(f"Processing {action} for order {order_id}")
+        logger.info(f"Processing {action} for order {order_id}")
 
-    try:
-        order = await get_order(order_id)
-        telegram_id = order.get("telegram_id")
-        if not telegram_id or not isinstance(telegram_id, int):
-            logger.error(f"Invalid or missing telegram_id for order {order_id}")
-            await callback.answer("❌ telegram_id نامعتبر است!", show_alert=True)
-            return
-        plan_id, is_renewal = order["plan_id"], order.get("is_renewal", False)
-        plan = get_plan_by_id(plan_id)
-        if not plan:
-            logger.error(f"Invalid plan: {plan_id}")
-            await callback.answer("❌ پلن نامعتبره!", show_alert=True)
-            return
-        logger.info(f"Order {order_id} fetched successfully")
-    except Exception as e:
-        logger.error(f"Failed to fetch order {order_id}: {e}")
-        await callback.answer("❌ سفارش یافت نشد!", show_alert=True)
-        return
-
-    if action == "confirm":
         try:
-            existing_user = await get_user_by_telegram_id(telegram_id)
-            if existing_user:
-                username = existing_user.get("username")
-                user_info = await renew_user(
-                    username,
-                    plan["data_limit"],
-                    plan["expire_days"],
-                    plan["users"],
-                    telegram_id,
-                )
-            else:
-                username = f"user_{uuid.uuid4().hex[:8]}"
-                user_info = await create_user(
-                    username,
-                    plan["data_limit"],
-                    plan["expire_days"],
-                    plan["users"],
-                    telegram_id,
-                )
+            order = await get_order(order_id)
+            telegram_id = order.get("telegram_id")
+            if not telegram_id or not isinstance(telegram_id, int):
+                logger.error(f"Invalid or missing telegram_id for order {order_id}")
+                await callback.answer("❌ telegram_id نامعتبر است!", show_alert=True)
+                return
+            plan_id, is_renewal = order["plan_id"], order.get("is_renewal", False)
+            plan = get_plan_by_id(plan_id)
+            if not plan:
+                logger.error(f"Invalid plan: {plan_id}")
+                await callback.answer("❌ پلن نامعتبره!", show_alert=True)
+                return
+            logger.info(f"Order {order_id} fetched successfully")
+        except Exception as e:
+            logger.error(f"Failed to fetch order {order_id}: {e}")
+            await callback.answer("❌ سفارش یافت نشد!", show_alert=True)
+            return
 
-            if user_info and "subscription_url" in user_info:
-                token = user_info["subscription_url"].split("/")[-2]
-                await save_user_token(telegram_id, token, username)
-                await update_order(
-                    order_id, {"status": "confirmed", "telegram_id": telegram_id}
+        if action == "confirm":
+            try:
+                existing_user = await get_user_by_telegram_id(telegram_id)
+                if existing_user:
+                    username = str(existing_user.get("username"))
+                    data_limit = int(plan["data_limit"])
+                    expire_days = int(plan["expire_days"])
+                    users = plan["users"]
+                    user_info = await renew_user(
+                        telegram_id,
+                        username,
+                        data_limit,
+                        expire_days,
+                        users,
+                    )
+                else:
+                    username = f"user_{uuid.uuid4().hex[:8]}"
+                    data_limit = int(plan["data_limit"])
+                    expire_days = int(plan["expire_days"])
+                    users = plan["users"]
+                    user_info = await create_user(
+                        telegram_id,
+                        username,
+                        data_limit,
+                        expire_days,
+                        users,
+                    )
+
+                if user_info and "subscription_url" in user_info:
+                    token = user_info["subscription_url"].split("/")[-2]
+                    await save_user_token(telegram_id, token, username)
+                    await update_order(
+                        order_id, {"status": "confirmed", "telegram_id": telegram_id}
+                    )
+                    message_text = (
+                        (
+                            f"✅ **تمدید اکانت شما تأیید شد!** 🎉\n"
+                            f"👤 **نام کاربری**: {username}\n"
+                            f"📈 **حجم**: {data_limit / 1073741824 if data_limit else '♾️ نامحدود'} گیگابایت\n"
+                            f"⏳ **مدت**: {expire_days if expire_days else 'لایف‌تایم'} روز\n"
+                            f"🔗 **لینک اشتراک**: {user_info['subscription_url']}\n"
+                            f"لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن."
+                        )
+                        if existing_user or is_renewal
+                        else (
+                            f"✅ **سفارش شما تأیید شد!** 🎉\n"
+                            f"👤 **نام کاربری**: {username}\n"
+                            f"📈 **حجم**: {data_limit / 1073741824 if data_limit else '♾️ نامحدود'} گیگابایت\n"
+                            f"⏳ **مدت**: {expire_days if expire_days else 'لایف‌تایم'} روز\n"
+                            f"🔗 **لینک اشتراک**: {user_info['subscription_url']}\n"
+                            f"لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن."
+                        )
+                    )
+                    await bot.send_message(
+                        telegram_id,
+                        message_text,
+                        parse_mode="markdown",
+                        reply_markup=get_main_menu(),
+                    )
+                    if (
+                        isinstance(callback.message, Message)
+                        and callback.message.caption
+                    ):
+                        await callback.message.edit_caption(
+                            caption=callback.message.caption
+                            + "\n\n✅ **وضعیت**: تأیید شده",
+                            parse_mode="Markdown",
+                        )
+                    await callback.answer(
+                        "سفارش تأیید شد و اکانت برای کاربر ایجاد/تمدید شد!"
+                    )
+                else:
+                    logger.error(
+                        f"Failed to {'renew' if existing_user else 'create'} user for order {order_id}: {user_info}"
+                    )
+                    await callback.answer(
+                        f"خطا در {'تمدید' if existing_user else 'ایجاد'} اکانت: {user_info}",
+                        show_alert=True,
+                    )
+            except Exception as e:
+                logger.error(f"Failed to confirm order {order_id}: {e}")
+                await callback.answer(
+                    f"❌ خطا در تأیید سفارش: {str(e)}", show_alert=True
                 )
-                message_text = (
-                    (
-                        f"✅ **تمدید اکانت شما تأیید شد!** 🎉\n"
-                        f"👤 **نام کاربری**: {username}\n"
-                        f"📈 **حجم**: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
-                        f"⏳ **مدت**: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
-                        f"🔗 **لینک اشتراک**: {user_info['subscription_url']}\n"
-                        f"لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن."
-                    )
-                    if existing_user or is_renewal
-                    else (
-                        f"✅ **سفارش شما تأیید شد!** 🎉\n"
-                        f"👤 **نام کاربری**: {username}\n"
-                        f"📈 **حجم**: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
-                        f"⏳ **مدت**: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
-                        f"🔗 **لینک اشتراک**: {user_info['subscription_url']}\n"
-                        f"لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن."
-                    )
+        else:
+            try:
+                await update_order(
+                    order_id, {"status": "rejected", "telegram_id": telegram_id}
                 )
                 await bot.send_message(
                     telegram_id,
-                    message_text,
+                    f"{'تمدید' if is_renewal else 'سفارش'} *{order_id}* توسط ادمین رد شد. 😔",
                     parse_mode="markdown",
-                    reply_markup=get_main_menu(),
                 )
-                await callback.message.edit_caption(
-                    caption=callback.message.caption + "\n\n✅ **وضعیت**: تأیید شده",
-                    parse_mode="Markdown",
-                )
-                await callback.answer(
-                    "سفارش تأیید شد و اکانت برای کاربر ایجاد/تمدید شد!"
-                )
-            else:
-                logger.error(
-                    f"Failed to {'renew' if existing_user else 'create'} user for order {order_id}: {user_info}"
-                )
-                await callback.answer(
-                    f"خطا در {'تمدید' if existing_user else 'ایجاد'} اکانت: {user_info.get('error', 'Unknown error')}",
-                    show_alert=True,
-                )
-        except Exception as e:
-            logger.error(f"Failed to confirm order {order_id}: {e}")
-            await callback.answer(f"❌ خطا در تأیید سفارش: {str(e)}", show_alert=True)
-    else:
-        try:
-            await update_order(
-                order_id, {"status": "rejected", "telegram_id": telegram_id}
-            )
-            await bot.send_message(
-                telegram_id,
-                f"{'تمدید' if is_renewal else 'سفارش'} *{order_id}* توسط ادمین رد شد. 😔",
-                parse_mode="markdown",
-            )
-            await callback.message.edit_caption(
-                caption=callback.message.caption + "\n\n❌ **وضعیت**: رد شده",
-                parse_mode="Markdown",
-            )
-            await callback.answer("سفارش رد شد!")
-        except Exception as e:
-            logger.error(f"Failed to reject order {order_id}: {e}")
-            await callback.answer(f"❌ خطا در رد سفارش: {str(e)}", show_alert=True)
+                if isinstance(callback.message, Message) and callback.message.caption:
+                    await callback.message.edit_caption(
+                        caption=callback.message.caption + "\n\n❌ **وضعیت**: رد شده",
+                        parse_mode="Markdown",
+                    )
+                await callback.answer("سفارش رد شد!")
+            except Exception as e:
+                logger.error(f"Failed to reject order {order_id}: {e}")
+                await callback.answer(f"❌ خطا در رد سفارش: {str(e)}", show_alert=True)
