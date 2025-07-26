@@ -6,9 +6,14 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from config import CARD_HOLDER, CARD_NUMBER, CHANNEL_ID
 from keyboards.buy_menu import get_buy_menu, get_plan_menu
-from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
+from keyboards.main_menu import (
+    get_channel_join_keyboard,
+    get_main_menu,
+)
 from services.check_channel_membership import check_channel_membership
-from services.order_service import save_order
+from services.order_service import (
+    save_order,
+)
 from utils.logger import logger
 from utils.plans import get_plan_by_id
 
@@ -18,7 +23,7 @@ router = Router()
 @router.message(Command("buy"))
 @router.message(F.text == "🛒 خرید اکانت")
 async def buy_command(message: Message, bot: Bot):
-    user_id = str(message.from_user.id)
+    user_id = message.from_user.id
     logger.info(f"Buy command received from user {user_id}")
     if not await check_channel_membership(bot, user_id):
         await message.reply(
@@ -41,7 +46,7 @@ async def main_buy(callback: CallbackQuery, bot: Bot):
         await callback.message.delete()
     except TelegramBadRequest as e:
         logger.warning(f"Failed to delete message in main_buy: {e}")
-    user_id = str(callback.from_user.id)
+    user_id = callback.from_user.id
     if not await check_channel_membership(bot, user_id):
         await callback.message.answer(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
@@ -98,7 +103,7 @@ async def process_plan_selection(callback: CallbackQuery, bot: Bot):
     logger.info(
         f"Received select callback: {callback.data} from user {callback.from_user.id}"
     )
-    user_id = str(callback.from_user.id)
+    user_id = callback.from_user.id
     if not await check_channel_membership(bot, user_id):
         await callback.message.answer(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",

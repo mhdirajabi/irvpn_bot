@@ -27,7 +27,7 @@ router = Router()
 
 @router.message(F.photo)
 async def handle_receipt(message: Message, bot: Bot):
-    user_id = str(message.from_user.id)
+    user_id = message.from_user.id
     logger.info(f"Handling receipt for user: {user_id}")
     if not await check_channel_membership(bot, user_id):
         logger.warning(f"User {user_id} not in channel {CHANNEL_ID}")
@@ -77,10 +77,10 @@ async def handle_receipt(message: Message, bot: Bot):
         file = await bot.get_file(message.photo[-1].file_id)
         receipt_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
         caption = (
-            f"📥 *رسید پرداخت برای سفارش {order_id}\\:*\n"
-            f"👤 *کاربر*: {user_id}\n"
-            f"📦 *پلن*: {plan['name']}\n"
-            f"💸 *مبلغ*: {plan['price']} تومان"
+            f"📥 رسید پرداخت برای سفارش {order_id}:\n"
+            f"👤 کاربر: {user_id}\n"
+            f"📦 پلن: {plan['name']}\n"
+            f"💸 مبلغ: {plan['price']} تومان"
         )
         logger.debug(
             f"Caption: {caption}, Length: {len(caption.encode('utf-8'))} bytes"
@@ -104,6 +104,7 @@ async def handle_receipt(message: Message, bot: Bot):
                 "receipt_url": receipt_url,
                 "receipt_message_id": receipt_message.message_id,
                 "status": "pending",
+                "telegram_id": int(user_id),
             },
         )
         await message.reply(
