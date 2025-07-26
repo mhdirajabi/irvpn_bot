@@ -16,7 +16,7 @@ async def get_subscription_info(token: str):
         return None
 
 
-async def get_user_by_telegram_id(telegram_id: int) -> Optional[dict]:
+async def get_user_by_telegram_id(telegram_id: Optional[int]) -> Optional[dict]:
     try:
         users = await APIClient.get(
             "/users/",
@@ -46,18 +46,34 @@ async def get_user_data(telegram_id: int) -> tuple:
 
 async def save_user_token(telegram_id: int, token: str, username: str):
     try:
-        await APIClient.post(
-            "/users/",
-            {
-                "telegram_id": telegram_id,
-                "subscription_token": token,
-                "username": username,
-            },
-            base_url=DJANGO_API_URL,
-        )
-        logger.info(
-            f"User token saved for telegram_id={telegram_id}, username={username}"
-        )
+        # چک کردن وجود کاربر
+        user = await get_user_by_telegram_id(telegram_id)
+        if user:
+            await APIClient.put(
+                f"/users/{username}/",
+                {
+                    "telegram_id": telegram_id,
+                    "subscription_token": token,
+                    "username": username,
+                },
+                base_url=DJANGO_API_URL,
+            )
+            logger.info(
+                f"User token updated for telegram_id={telegram_id}, username={username}"
+            )
+        else:
+            await APIClient.post(
+                "/users/",
+                {
+                    "telegram_id": telegram_id,
+                    "subscription_token": token,
+                    "username": username,
+                },
+                base_url=DJANGO_API_URL,
+            )
+            logger.info(
+                f"User token saved for telegram_id={telegram_id}, username={username}"
+            )
     except Exception as e:
         logger.error(f"Failed to save user token for telegram_id={telegram_id}: {e}")
         raise
@@ -100,6 +116,7 @@ async def create_user(
         )
         logger.info(f"User {username} created successfully: {user_info}")
         try:
+            existing_user = await get_user_by_telegram_id(telegram_id)
             django_payload = {
                 "telegram_id": telegram_id,
                 "username": username,
@@ -109,8 +126,16 @@ async def create_user(
                 "data_limit_reset_strategy": "no_reset",
                 "subscription_url": user_info.get("subscription_url", ""),
             }
-            await APIClient.post("/users/", django_payload, base_url=DJANGO_API_URL)
-            logger.info(f"User {username} saved in Django")
+            if existing_user:
+                await APIClient.put(
+                    f"/users/{username}/",
+                    django_payload,
+                    base_url=DJANGO_API_URL,
+                )
+                logger.info(f"User {username} updated in Django")
+            else:
+                await APIClient.post("/users/", django_payload, base_url=DJANGO_API_URL)
+                logger.info(f"User {username} saved in Django")
         except Exception as e:
             logger.error(f"Failed to save user {username} in Django: {e}")
         return user_info
