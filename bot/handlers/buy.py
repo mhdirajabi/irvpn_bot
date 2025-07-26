@@ -78,11 +78,18 @@ async def process_buy_type(callback: CallbackQuery, bot: Bot):
         logger.warning(f"Failed to delete message in process_buy_type: {e}")
     category = callback.data.split("_")[1]
     logger.debug(f"Selected category: {category}")
-    await callback.message.answer(
-        f"*لطفاً پلن {category} رو انتخاب کن:*",
-        parse_mode="Markdown",
-        reply_markup=get_plan_menu(category),
-    )
+    if category == "back":
+        await callback.message.answer(
+            "*لطفاً نوع اکانت رو انتخاب کن:*",
+            parse_mode="Markdown",
+            reply_markup=get_buy_menu(),
+        )
+    else:
+        await callback.message.answer(
+            f"*لطفاً پلن {category} رو انتخاب کن:*",
+            parse_mode="Markdown",
+            reply_markup=get_plan_menu(category),
+        )
     await callback.answer()
 
 

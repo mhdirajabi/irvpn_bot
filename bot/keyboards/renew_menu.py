@@ -1,59 +1,36 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from utils.formatters import format_data_limit, format_expire_date
 from utils.plans import PLANS
 
 
 def get_renew_menu():
-    categories = sorted(set(plan["category"] for plan in PLANS if plan["is_active"]))
-    keyboard = []
-    # ساخت دکمه‌ها به صورت دوتایی
-    for i in range(0, len(categories), 2):
-        row = []
-        for category in categories[i : i + 2]:
-            text = (
-                "📈 اکانت حجمی"
-                if category == "volume"
-                else "♾️ اکانت نامحدود" if category == "unlimited" else "🧪 اکانت تست"
-            )
-            row.append(
-                InlineKeyboardButton(text=text, callback_data=f"renew_{category}")
-            )
-        keyboard.append(row)
-    # اضافه کردن دکمه بازگشت
-    keyboard.append(
+    keyboard = [
+        [
+            InlineKeyboardButton(text="🛒 اکانت حجمی", callback_data="renew_volume"),
+        ],
         [
             InlineKeyboardButton(
-                text="⬅️ بازگشت به منوی اصلی", callback_data="back_to_main"
-            )
-        ]
-    )
+                text="♾️ اکانت نامحدود", callback_data="renew_unlimited"
+            ),
+        ],
+        [
+            InlineKeyboardButton(text="↩️ بازگشت", callback_data="renew_back"),
+        ],
+    ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def get_renew_plan_menu(category: str):
-    # مرتب‌سازی پلن‌ها بر اساس قیمت
-    plans = sorted(
-        [plan for plan in PLANS if plan["category"] == category and plan["is_active"]],
-        key=lambda x: x["price"],
-    )
+    plans = [p for p in PLANS if p["category"] == category and p["is_active"]]
+    plans.sort(key=lambda x: x["price"])
     keyboard = []
-    # ساخت دکمه‌ها به صورت دوتایی
-    for i in range(0, len(plans), 2):
-        row = []
-        for plan in plans[i : i + 2]:
-            text = (
-                f"📦 {plan['name']} ({format_data_limit(plan['data_limit'])}, "
-                f"{format_expire_date(plan['expire_days'])})"
-            )
-            row.append(
-                InlineKeyboardButton(
-                    text=text, callback_data=f"renewselect_{plan['id']}"
-                )
-            )
+    for i, plan in enumerate(plans):
+        text = (
+            f"{plan['data_limit'] // 1073741824}G {plan['expire_days']}D - {plan['price'] // 1000}K"
+            if plan["data_limit"]
+            else f"∞ {plan['users']}U {plan['expire_days']}D"
+        )
+        callback_data = f"renewselect_{plan['id']}"
+        row = [InlineKeyboardButton(text=text, callback_data=callback_data)]
         keyboard.append(row)
-    # اضافه کردن دکمه‌های بازگشت
-    keyboard.append([InlineKeyboardButton(text="⬅️ بازگشت", callback_data="buy_back")])
-    keyboard.append(
-        [InlineKeyboardButton(text="⬅️ منوی اصلی", callback_data="back_to_main")]
-    )
+    keyboard.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="renew_back")])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
