@@ -15,7 +15,7 @@ from services.check_channel_membership import check_channel_membership
 from services.order_service import save_order
 from services.user_service import get_user_data
 from utils.logger import logger
-from utils.plans import PLANS
+from utils.plans import get_plan_by_id
 
 router = Router()
 
@@ -71,19 +71,11 @@ async def process_renew_type(callback: CallbackQuery, bot: Bot):
         await callback.message.delete()
     except TelegramBadRequest as e:
         logger.warning(f"Failed to delete message in process_renew_type: {str(e)}")
-    account_type = callback.data.split("_")[1]
-    plans = PLANS.get(account_type, {})
-    if not plans:
-        await callback.message.answer(
-            "❌ *نوع اکانت نامعتبر است!*",
-            parse_mode="Markdown",
-            reply_markup=get_main_menu_inline(),
-        )
-        return
+    category = callback.data.split("_")[1]
     await callback.message.answer(
-        f"*لطفاً پلن {account_type} برای تمدید رو انتخاب کن:*",
+        f"*لطفاً پلن {category} برای تمدید رو انتخاب کن:*",
         parse_mode="Markdown",
-        reply_markup=get_renew_plan_menu(account_type, plans),
+        reply_markup=get_renew_plan_menu(category),
     )
     await callback.answer()
 
@@ -102,8 +94,8 @@ async def process_renew_plan_selection(callback: CallbackQuery, bot: Bot):
         logger.warning(
             f"Failed to delete message in process_renew_plan_selection: {str(e)}"
         )
-    _, account_type, plan_id = callback.data.split("_")
-    plan = PLANS.get(account_type, {}).get(plan_id)
+    plan_id = callback.data.replace("renewselect_", "")
+    plan = get_plan_by_id(plan_id)
     if not plan:
         await callback.message.answer(
             "❌ *پلن نامعتبر است!*",
@@ -112,18 +104,24 @@ async def process_renew_plan_selection(callback: CallbackQuery, bot: Bot):
         )
         return
     order_id = str(uuid.uuid4())
-    await save_order(
-        user_id, order_id, plan_id, account_type, plan["price"], is_renewal=True
-    )
-    await callback.message.answer(
-        f"شما پلن *{plan_id}* ({account_type}) برای تمدید انتخاب کردی:\n"
-        f"📈 *حجم*: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
-        f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
-        f"💸 *مبلغ*: {plan['price']} تومان\n\n"
-        f"لطفاً مبلغ رو به شماره کارت زیر واریز کن و رسید رو ظرف 30 دقیقه بفرست:\n"
-        f"💳 *شماره کارت*: `{CARD_NUMBER}` (به نام {CARD_HOLDER})\n\n"
-        f"برای ارسال رسید، کافیه عکس رسید رو همینجا بفرستی.",
-        parse_mode="Markdown",
-        reply_markup=get_main_menu(),
-    )
+    try:
+        await save_order(user_id, order_id, plan_id, plan["price"], is_renewal=True)
+        await callback.message.answer(
+            f"شما پلن *{plan['name']}* برای تمدید انتخاب کردی:\n"
+            f"📈 *حجم*: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
+            f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
+            f"💸 *مبلغ*: {plan['price']} تومان\n\n"
+            f"لطفاً مبلغ رو به شماره کارت زیر واریز کن و رسید رو ظرف 30 دقیقه بفرست:\n"
+            f"💳 *شماره کارت*: `{CARD_NUMBER}` (به نام {CARD_HOLDER})\n\n"
+            f"برای ارسال رسید، کافیه عکس رسید رو همینجا بفرستی.",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+    except Exception as e:
+        logger.error(f"Failed to save renewal order for user {user_id}: {e}")
+        await callback.message.answer(
+            "❌ *خطا در ثبت سفارش تمدید! لطفاً دوباره امتحان کنید.*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
     await callback.answer()

@@ -4,17 +4,12 @@ from utils.logger import logger
 
 
 async def save_order(
-    telegram_id: int,
-    order_id: str,
-    plan_id: str,
-    plan_type: str,
-    price: int,
-    is_renewal: bool = False,
+    telegram_id: int, order_id: str, plan_id: str, price: int, is_renewal: bool = False
 ):
     data = {
         "telegram_id": telegram_id,
         "order_id": order_id,
-        "plan_id": f"{plan_type}:{plan_id}",
+        "plan_id": plan_id,
         "status": "pending",
         "price": price,
         "is_renewal": is_renewal,

@@ -1,7 +1,6 @@
 import uuid
 
 from aiogram import Bot, F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from config import ADMIN_TELEGRAM_ID, BOT_TOKEN, CHANNEL_ID
 from handlers.admin import is_admin
@@ -21,7 +20,7 @@ from services.user_service import (
     save_user_token,
 )
 from utils.logger import logger
-from utils.plans import PLANS
+from utils.plans import get_plan_by_id
 
 router = Router()
 
@@ -35,7 +34,7 @@ async def handle_receipt(message: Message, bot: Bot):
         await message.reply(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
             parse_mode="Markdown",
-            reply_markup=get_channel_keyboard(),
+            reply_markup=get_channel_join_keyboard(),
         )
         return
 
@@ -50,7 +49,7 @@ async def handle_receipt(message: Message, bot: Bot):
                 f"لطفاً مطمئن شوید که سفارش خود را ثبت کرده‌اید.\n"
                 f"وضعیت سفارش‌ها: {all_orders if all_orders else 'هیچ سفارشی یافت نشد'}",
                 parse_mode="markdown",
-                reply_markup=get_menu(),
+                reply_markup=get_main_menu(),
             )
             return
         order = sorted(orders, key=lambda x: x["created_at"], reverse=True)[0]
@@ -59,7 +58,11 @@ async def handle_receipt(message: Message, bot: Bot):
             order["plan_id"],
             order.get("is_renewal", False),
         )
-        plan_type, _ = plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
+        plan = get_plan_by_id(plan_id)
+        if not plan:
+            logger.error(f"Invalid plan: {plan_id}")
+            await message.reply("❌ *پلن نامعتبر است!*", parse_mode="Markdown")
+            return
         logger.debug(
             f"Processing order: {order_id}, plan_id: {plan_id}, is_renewal: {is_renewal}"
         )
@@ -68,12 +71,6 @@ async def handle_receipt(message: Message, bot: Bot):
         await message.reply(
             f"❌ *خطا در ارتباط با سرور*: {str(e)}", parse_mode="markdown"
         )
-        return
-
-    plan = PLANS.get(plan_type, {}).get(plan_id)
-    if not plan:
-        logger.error(f"Invalid plan: {plan_type}:{plan_id}")
-        await message.reply("❌ *پلن نامعتبر است!*", parse_mode="Markdown")
         return
 
     try:
@@ -85,7 +82,7 @@ async def handle_receipt(message: Message, bot: Bot):
             caption=(
                 f"📥 *رسید پرداخت برای {'تمدید' if is_renewal else 'سفارش'} {order_id}:*\n"
                 f"👤 *کاربر*: {user_id}\n"
-                f"📦 *پلن*: {plan_id} ({plan_type})\n"
+                f"📦 *پلن*: {plan['name']}\n"
                 f"📈 *حجم*: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
                 f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
                 f"💸 *مبلغ*: {plan['price']} تومان\n"
@@ -108,14 +105,14 @@ async def handle_receipt(message: Message, bot: Bot):
         await message.reply(
             "✅ *رسید شما برای ادمین ارسال شد! منتظر تأیید باشید.*",
             parse_mode="Markdown",
-            reply_markup=get_menu(),
+            reply_markup=get_main_menu(),
         )
     except Exception as e:
         logger.error(f"Failed to process receipt for order {order_id}: {e}")
         await message.reply(
             f"❌ *خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.*: {str(e)}",
             parse_mode="Markdown",
-            reply_markup=get_menu(),
+            reply_markup=get_main_menu(),
         )
 
 
@@ -134,20 +131,18 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
         order = await get_order(order_id)
         telegram_id, plan_id, is_renewal = (
             order["telegram_id"],
-            order["plan"],
+            order["plan_id"],
             order.get("is_renewal", False),
         )
-        plan_type, _ = plan_id.split(":") if ":" in plan_id else (plan_id, plan_id)
+        plan = get_plan_by_id(plan_id)
+        if not plan:
+            logger.error(f"Invalid plan: {plan_id}")
+            await callback.answer("❌ پلن نامعتبره!", show_alert=True)
+            return
         logger.info(f"Order {order_id} fetched successfully")
     except Exception as e:
         logger.error(f"Failed to fetch order {order_id}: {e}")
         await callback.answer("❌ سفارش یافت نشد!", show_alert=True)
-        return
-
-    plan = PLANS.get(plan_type, {}).get(plan_id)
-    if not plan:
-        logger.error(f"Invalid plan: {plan_type}:{plan_id}")
-        await callback.answer("❌ پلن نامعتبره!", show_alert=True)
         return
 
     if action == "confirm":
@@ -174,12 +169,12 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                         ✅ **تمدید اکانت شما تأیید شد!** 🎉
                         👤 **نام کاربری**: {username}
                         📈 **حجم**: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت
-                        ⏳ **مدت**: {plan['expire_days'] if 'expire_days' in plan else 'لایف‌تایم'} روز
+                        ⏳ **مدت**: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز
                         🔗 **لینک اشتراک**: {user_info['subscription_url']}
                         لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن.
                         """,
                         parse_mode="markdown",
-                        reply_markup=get_menu(),
+                        reply_markup=get_main_menu(),
                     )
                     await callback.message.edit_caption(
                         caption=callback.message.caption
@@ -214,12 +209,12 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                         ✅ **سفارش شما تأیید شد!** 🎉
                         👤 **نام کاربری**: {username}
                         📈 **حجم**: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت
-                        ⏳ **مدت**: {plan['expire_days'] if 'expire_days' in plan else 'لایف‌تایم'} روز
+                        ⏳ **مدت**: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز
                         🔗 **لینک اشتراک**: {user_info['subscription_url']}
                         لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن.
                         """,
                         parse_mode="markdown",
-                        reply_markup=get_menu(),
+                        reply_markup=get_main_menu(),
                     )
                     await callback.message.edit_caption(
                         caption=callback.message.caption
