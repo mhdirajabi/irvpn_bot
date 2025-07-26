@@ -6,6 +6,8 @@ def get_buy_menu():
     keyboard = [
         [
             InlineKeyboardButton(text="🛒 اکانت حجمی", callback_data="buy_volume"),
+        ],
+        [
             InlineKeyboardButton(text="♾️ اکانت نامحدود", callback_data="buy_unlimited"),
         ],
         [
@@ -24,9 +26,9 @@ def get_plan_menu(category: str):
     keyboard = []
     for i, plan in enumerate(plans):
         text = (
-            f"{plan['data_limit'] // 1073741824}G {plan['expire_days']}D - {plan['price'] // 1000}K"
+            f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - {plan['expire_days']} روزه - {plan['price']} تومان"
             if plan["data_limit"]
-            else f"∞ {plan['users']}U {plan['expire_days']}D"
+            else f"♾️ نامحدود {plan['users']} کاربره - {plan['expire_days']} روزه"
         )
         callback_data = f"select_{plan['id']}"
         row = [InlineKeyboardButton(text=text, callback_data=callback_data)]
