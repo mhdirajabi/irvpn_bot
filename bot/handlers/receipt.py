@@ -89,16 +89,11 @@ async def handle_receipt(message: Message, bot: Bot):
             ADMIN_TELEGRAM_ID,
             photo=message.photo[-1].file_id,
             caption=caption,
-            # حذف parse_mode="Markdown"
             reply_markup=get_receipt_admin_menu(order_id),
         )
         await bot.send_message(
             ADMIN_TELEGRAM_ID,
             f"لینک رسید: {receipt_url}",
-            # حذف parse_mode="Markdown"
-        )
-        logger.info(
-            f"Receipt sent to admin for order {order_id}, message_id: {receipt_message.message_id}"
         )
         await update_order(
             order_id,
@@ -134,11 +129,12 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
 
     try:
         order = await get_order(order_id)
-        telegram_id, plan_id, is_renewal = (
-            order["telegram_id"],
-            order["plan_id"],
-            order.get("is_renewal", False),
-        )
+        telegram_id = order.get("telegram_id")
+        if not telegram_id or not isinstance(telegram_id, int):
+            logger.error(f"Invalid or missing telegram_id for order {order_id}")
+            await callback.answer("❌ telegram_id نامعتبر است!", show_alert=True)
+            return
+        plan_id, is_renewal = order["plan_id"], order.get("is_renewal", False)
         plan = get_plan_by_id(plan_id)
         if not plan:
             logger.error(f"Invalid plan: {plan_id}")
@@ -154,7 +150,7 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
         try:
             existing_user = await get_user_by_telegram_id(telegram_id)
             if existing_user:
-                username = existing_user["username"]
+                username = existing_user.get("username")
                 user_info = await renew_user(
                     username,
                     plan["data_limit"],
@@ -175,7 +171,9 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
             if user_info and "subscription_url" in user_info:
                 token = user_info["subscription_url"].split("/")[-2]
                 await save_user_token(telegram_id, token, username)
-                await update_order(order_id, {"status": "confirmed"})
+                await update_order(
+                    order_id, {"status": "confirmed", "telegram_id": telegram_id}
+                )
                 message_text = (
                     (
                         f"✅ **تمدید اکانت شما تأیید شد!** 🎉\n"
@@ -221,7 +219,9 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
             await callback.answer(f"❌ خطا در تأیید سفارش: {str(e)}", show_alert=True)
     else:
         try:
-            await update_order(order_id, {"status": "rejected"})
+            await update_order(
+                order_id, {"status": "rejected", "telegram_id": telegram_id}
+            )
             await bot.send_message(
                 telegram_id,
                 f"{'تمدید' if is_renewal else 'سفارش'} *{order_id}* توسط ادمین رد شد. 😔",
