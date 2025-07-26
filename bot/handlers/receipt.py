@@ -77,12 +77,14 @@ async def handle_receipt(message: Message, bot: Bot):
         file = await bot.get_file(message.photo[-1].file_id)
         receipt_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
         caption = (
-            f"📥 *رسید پرداخت برای* {'*تمدید*' if is_renewal else '*سفارش*'} {order_id} *:* \n"
+            f"📥 *رسید پرداخت برای سفارش {order_id}\\:*\n"
             f"👤 *کاربر*: {user_id}\n"
             f"📦 *پلن*: {plan['name']}\n"
             f"💸 *مبلغ*: {plan['price']} تومان"
         )
-        logger.debug(f"Caption length: {len(caption.encode('utf-8'))} bytes")
+        logger.debug(
+            f"Caption: {caption}, Length: {len(caption.encode('utf-8'))} bytes"
+        )
         receipt_message = await bot.send_photo(
             ADMIN_TELEGRAM_ID,
             photo=message.photo[-1].file_id,
