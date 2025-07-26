@@ -15,7 +15,7 @@ from services.order_service import (
 )
 from services.user_service import (
     create_user,
-    get_user_data,
+    get_user_by_telegram_id,
     renew_user,
     save_user_token,
 )
@@ -152,8 +152,9 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
 
     if action == "confirm":
         try:
-            token, username = await get_user_data(telegram_id)
-            if is_renewal and username:
+            existing_user = await get_user_by_telegram_id(telegram_id)
+            if existing_user:
+                username = existing_user["username"]
                 user_info = await renew_user(
                     username,
                     plan["data_limit"],
@@ -161,40 +162,6 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                     plan["users"],
                     telegram_id,
                 )
-                if user_info and "subscription_url" in user_info:
-                    await save_user_token(
-                        telegram_id,
-                        user_info["subscription_url"].split("/")[-2],
-                        username,
-                    )
-                    await update_order(order_id, {"status": "confirmed"})
-                    await bot.send_message(
-                        telegram_id,
-                        f"""
-                        ✅ **تمدید اکانت شما تأیید شد!** 🎉
-                        👤 **نام کاربری**: {username}
-                        📈 **حجم**: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت
-                        ⏳ **مدت**: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز
-                        🔗 **لینک اشتراک**: {user_info['subscription_url']}
-                        لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن.
-                        """,
-                        parse_mode="markdown",
-                        reply_markup=get_main_menu(),
-                    )
-                    await callback.message.edit_caption(
-                        caption=callback.message.caption
-                        + "\n\n✅ **وضعیت**: تأیید شده",
-                        parse_mode="Markdown",
-                    )
-                    await callback.answer("تمدید اکانت تأیید شد!")
-                else:
-                    logger.error(
-                        f"Failed to renew user for order {order_id}: {user_info}"
-                    )
-                    await callback.answer(
-                        f"خطا در تمدید اکانت: {user_info.get('error', 'Unknown error')}",
-                        show_alert=True,
-                    )
             else:
                 username = f"user_{uuid.uuid4().hex[:8]}"
                 user_info = await create_user(
@@ -204,41 +171,55 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                     plan["users"],
                     telegram_id,
                 )
-                if user_info and "subscription_url" in user_info:
-                    token = user_info["subscription_url"].split("/")[-2]
-                    await save_user_token(telegram_id, token, username)
-                    await update_order(order_id, {"status": "confirmed"})
-                    await bot.send_message(
-                        telegram_id,
-                        f"""
-                        ✅ **سفارش شما تأیید شد!** 🎉
-                        👤 **نام کاربری**: {username}
-                        📈 **حجم**: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت
-                        ⏳ **مدت**: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز
-                        🔗 **لینک اشتراک**: {user_info['subscription_url']}
-                        لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن.
-                        """,
-                        parse_mode="markdown",
-                        reply_markup=get_main_menu(),
+
+            if user_info and "subscription_url" in user_info:
+                token = user_info["subscription_url"].split("/")[-2]
+                await save_user_token(telegram_id, token, username)
+                await update_order(order_id, {"status": "confirmed"})
+                message_text = (
+                    (
+                        f"✅ **تمدید اکانت شما تأیید شد!** 🎉\n"
+                        f"👤 **نام کاربری**: {username}\n"
+                        f"📈 **حجم**: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
+                        f"⏳ **مدت**: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
+                        f"🔗 **لینک اشتراک**: {user_info['subscription_url']}\n"
+                        f"لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن."
                     )
-                    await callback.message.edit_caption(
-                        caption=callback.message.caption
-                        + "\n\n✅ **وضعیت**: تأیید شده",
-                        parse_mode="Markdown",
+                    if existing_user or is_renewal
+                    else (
+                        f"✅ **سفارش شما تأیید شد!** 🎉\n"
+                        f"👤 **نام کاربری**: {username}\n"
+                        f"📈 **حجم**: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
+                        f"⏳ **مدت**: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
+                        f"🔗 **لینک اشتراک**: {user_info['subscription_url']}\n"
+                        f"لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن."
                     )
-                    await callback.answer("سفارش تأیید شد و اکانت برای کاربر ایجاد شد!")
-                else:
-                    logger.error(
-                        f"Failed to create user for order {order_id}: {user_info}"
-                    )
-                    await callback.answer(
-                        f"خطا در ایجاد اکانت: {user_info.get('error', 'Unknown error')}",
-                        show_alert=True,
-                    )
+                )
+                await bot.send_message(
+                    telegram_id,
+                    message_text,
+                    parse_mode="markdown",
+                    reply_markup=get_main_menu(),
+                )
+                await callback.message.edit_caption(
+                    caption=callback.message.caption + "\n\n✅ **وضعیت**: تأیید شده",
+                    parse_mode="Markdown",
+                )
+                await callback.answer(
+                    "سفارش تأیید شد و اکانت برای کاربر ایجاد/تمدید شد!"
+                )
+            else:
+                logger.error(
+                    f"Failed to {'renew' if existing_user else 'create'} user for order {order_id}: {user_info}"
+                )
+                await callback.answer(
+                    f"خطا در {'تمدید' if existing_user else 'ایجاد'} اکانت: {user_info.get('error', 'Unknown error')}",
+                    show_alert=True,
+                )
         except Exception as e:
             logger.error(f"Failed to confirm order {order_id}: {e}")
             await callback.answer(f"❌ خطا در تأیید سفارش: {str(e)}", show_alert=True)
-    else:  # reject
+    else:
         try:
             await update_order(order_id, {"status": "rejected"})
             await bot.send_message(
