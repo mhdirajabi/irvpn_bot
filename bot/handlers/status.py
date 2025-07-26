@@ -57,7 +57,39 @@ async def main_status(callback: CallbackQuery, bot: Bot):
         await callback.message.delete()
     except TelegramBadRequest as e:
         logger.warning(f"Failed to delete message in main_status: {str(e)}")
-    message = callback.message
-    message.from_user = callback.from_user
-    await status_command(message, bot)
+    user_id = callback.from_user.id
+    if not await check_channel_membership(bot, user_id):
+        await callback.message.answer(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
+            parse_mode="Markdown",
+            reply_markup=get_channel_join_keyboard(),
+        )
+        await callback.answer()
+        return
+    try:
+        user = await get_user_by_telegram_id(user_id)
+        if not user:
+            await callback.message.answer(
+                "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                parse_mode="Markdown",
+                reply_markup=get_main_menu(),
+            )
+            await callback.answer()
+            return
+        await callback.message.answer(
+            f"*وضعیت اکانت شما:* 📋\n"
+            f"👤 *نام کاربری*: {user['username']}\n"
+            f"📈 *حجم*: {format_data_limit(user['data_limit'])}\n"
+            f"⏳ *انقضا*: {format_expire_date(user['expire'])}\n"
+            f"✅ *وضعیت*: {user['status']}",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch user status for telegram_id={user_id}: {e}")
+        await callback.message.answer(
+            "❌ *خطا در دریافت اطلاعات اکانت!*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
     await callback.answer()

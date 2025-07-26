@@ -5,15 +5,11 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from config import CARD_HOLDER, CARD_NUMBER, CHANNEL_ID
-from keyboards.main_menu import (
-    get_channel_join_keyboard,
-    get_main_menu,
-    get_main_menu_inline,
-)
+from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
 from keyboards.renew_menu import get_renew_menu, get_renew_plan_menu
 from services.check_channel_membership import check_channel_membership
 from services.order_service import save_order
-from services.user_service import get_user_data
+from services.user_service import get_user_by_telegram_id
 from utils.logger import logger
 from utils.plans import get_plan_by_id
 
@@ -23,7 +19,8 @@ router = Router()
 @router.message(Command("renew"))
 @router.message(F.text == "🔄 تمدید اکانت")
 async def renew_command(message: Message, bot: Bot):
-    user_id = message.from_user.id
+    user_id = str(message.from_user.id)
+    logger.info(f"Renew command received from user {user_id}")
     if not await check_channel_membership(bot, user_id):
         await message.reply(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
@@ -31,10 +28,10 @@ async def renew_command(message: Message, bot: Bot):
             reply_markup=get_channel_join_keyboard(),
         )
         return
-    token, username = await get_user_data(user_id)
-    if not username:
+    user = await get_user_by_telegram_id(user_id)
+    if not user:
         await message.reply(
-            "⚠️ *لطفاً اول کد اشتراک رو با /settoken وارد کنید.*",
+            "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
             parse_mode="Markdown",
             reply_markup=get_main_menu(),
         )
@@ -52,26 +49,53 @@ async def main_renew(callback: CallbackQuery, bot: Bot):
     try:
         await callback.message.delete()
     except TelegramBadRequest as e:
-        logger.warning(f"Failed to delete message in main_renew: {str(e)}")
-    message = callback.message
-    message.from_user = callback.from_user
-    await renew_command(message, bot)
+        logger.warning(f"Failed to delete message in main_renew: {e}")
+    user_id = str(callback.from_user.id)
+    if not await check_channel_membership(bot, user_id):
+        await callback.message.answer(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
+            parse_mode="Markdown",
+            reply_markup=get_channel_join_keyboard(),
+        )
+        await callback.answer()
+        return
+    user = await get_user_by_telegram_id(user_id)
+    if not user:
+        await callback.message.answer(
+            "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+        await callback.answer()
+        return
+    await callback.message.answer(
+        "*لطفاً نوع اکانت برای تمدید رو انتخاب کن:*",
+        parse_mode="Markdown",
+        reply_markup=get_renew_menu(),
+    )
     await callback.answer()
 
 
 @router.callback_query(lambda c: c.data.startswith("renew_"))
 async def process_renew_type(callback: CallbackQuery, bot: Bot):
-    user_id = callback.from_user.id
+    logger.info(
+        f"Received renew callback: {callback.data} from user {callback.from_user.id}"
+    )
+    user_id = str(callback.from_user.id)
     if not await check_channel_membership(bot, user_id):
-        await callback.message.reply(
-            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}", parse_mode="Markdown"
+        await callback.message.answer(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
+            parse_mode="Markdown",
+            reply_markup=get_channel_join_keyboard(),
         )
+        await callback.answer()
         return
     try:
         await callback.message.delete()
     except TelegramBadRequest as e:
-        logger.warning(f"Failed to delete message in process_renew_type: {str(e)}")
+        logger.warning(f"Failed to delete message in process_renew_type: {e}")
     category = callback.data.split("_")[1]
+    logger.debug(f"Selected category: {category}")
     await callback.message.answer(
         f"*لطفاً پلن {category} برای تمدید رو انتخاب کن:*",
         parse_mode="Markdown",
@@ -82,26 +106,33 @@ async def process_renew_type(callback: CallbackQuery, bot: Bot):
 
 @router.callback_query(lambda c: c.data.startswith("renewselect_"))
 async def process_renew_plan_selection(callback: CallbackQuery, bot: Bot):
-    user_id = callback.from_user.id
+    logger.info(
+        f"Received renewselect callback: {callback.data} from user {callback.from_user.id}"
+    )
+    user_id = str(callback.from_user.id)
     if not await check_channel_membership(bot, user_id):
-        await callback.message.reply(
-            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}", parse_mode="Markdown"
+        await callback.message.answer(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
+            parse_mode="Markdown",
+            reply_markup=get_channel_join_keyboard(),
         )
+        await callback.answer()
         return
     try:
         await callback.message.delete()
     except TelegramBadRequest as e:
-        logger.warning(
-            f"Failed to delete message in process_renew_plan_selection: {str(e)}"
-        )
+        logger.warning(f"Failed to delete message in process_renew_plan_selection: {e}")
     plan_id = callback.data.replace("renewselect_", "")
+    logger.debug(f"Selected plan_id: {plan_id}")
     plan = get_plan_by_id(plan_id)
     if not plan:
+        logger.error(f"Invalid plan_id: {plan_id}")
         await callback.message.answer(
             "❌ *پلن نامعتبر است!*",
             parse_mode="Markdown",
-            reply_markup=get_main_menu_inline(),
+            reply_markup=get_main_menu(),
         )
+        await callback.answer()
         return
     order_id = str(uuid.uuid4())
     try:

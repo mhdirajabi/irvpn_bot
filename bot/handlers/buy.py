@@ -1,19 +1,14 @@
-from uuid import uuid4
+import uuid
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from config import CARD_HOLDER, CARD_NUMBER, CHANNEL_ID
-from keyboards.buy_menu import get_buy_menu
-from keyboards.main_menu import (
-    get_channel_join_keyboard,
-    get_main_menu,
-    get_main_menu_inline,
-)
+from keyboards.buy_menu import get_buy_menu, get_plan_menu
+from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
 from services.check_channel_membership import check_channel_membership
 from services.order_service import save_order
-from services.user_service import create_user, save_user_token
 from utils.logger import logger
 from utils.plans import get_plan_by_id
 
@@ -23,14 +18,8 @@ router = Router()
 @router.message(Command("buy"))
 @router.message(F.text == "🛒 خرید اکانت")
 async def buy_command(message: Message, bot: Bot):
-    if message.from_user is None:
-        await message.reply(
-            "❌ *خطا: اطلاعات کاربر یافت نشد!*",
-            parse_mode="Markdown",
-            reply_markup=get_main_menu_inline(),
-        )
-        return
-    user_id = message.from_user.id
+    user_id = str(message.from_user.id)
+    logger.info(f"Buy command received from user {user_id}")
     if not await check_channel_membership(bot, user_id):
         await message.reply(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
@@ -39,7 +28,7 @@ async def buy_command(message: Message, bot: Bot):
         )
         return
     await message.reply(
-        "*لطفاً نوع اکانت را انتخاب کنید:*",
+        "*لطفاً نوع اکانت رو انتخاب کن:*",
         parse_mode="Markdown",
         reply_markup=get_buy_menu(),
     )
@@ -49,136 +38,103 @@ async def buy_command(message: Message, bot: Bot):
 async def main_buy(callback: CallbackQuery, bot: Bot):
     logger.debug(f"Received callback: main_buy from user {callback.from_user.id}")
     try:
-        try:
-            if callback.message is not None:
-                await bot.edit_message_reply_markup(
-                    chat_id=callback.message.chat.id,
-                    message_id=callback.message.message_id,
-                    reply_markup=None,
-                )
-        except TelegramBadRequest as e:
-            logger.warning(f"Failed to edit reply markup in main_buy: {str(e)}")
+        await callback.message.delete()
     except TelegramBadRequest as e:
-        logger.warning(f"Failed to delete message in main_buy: {str(e)}")
-    message = callback.message
-    await buy_command(message, bot)
+        logger.warning(f"Failed to delete message in main_buy: {e}")
+    user_id = str(callback.from_user.id)
+    if not await check_channel_membership(bot, user_id):
+        await callback.message.answer(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
+            parse_mode="Markdown",
+            reply_markup=get_channel_join_keyboard(),
+        )
+        await callback.answer()
+        return
+    await callback.message.answer(
+        "*لطفاً نوع اکانت رو انتخاب کن:*",
+        parse_mode="Markdown",
+        reply_markup=get_buy_menu(),
+    )
     await callback.answer()
 
 
-@router.callback_query(lambda c: c.data == "buy_back")
-async def buy_back(callback: CallbackQuery, bot: Bot):
-    logger.debug(f"Received callback: buy_back from user {callback.from_user.id}")
-
-    try:
-        if callback.message is not None:
-            await bot.edit_message_reply_markup(
-                chat_id=callback.message.chat.id,
-                message_id=callback.message.message_id,
-                reply_markup=None,
-            )
-    except TelegramBadRequest as e:
-        logger.warning(f"Failed to edit reply markup in buy_back: {str(e)}")
-    if callback.message is not None:
+@router.callback_query(lambda c: c.data.startswith("buy_"))
+async def process_buy_type(callback: CallbackQuery, bot: Bot):
+    logger.info(
+        f"Received buy callback: {callback.data} from user {callback.from_user.id}"
+    )
+    user_id = str(callback.from_user.id)
+    if not await check_channel_membership(bot, user_id):
         await callback.message.answer(
-            "*لطفاً نوع اکانت را انتخاب کنید:*",
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
             parse_mode="Markdown",
-            reply_markup=get_buy_menu(),
+            reply_markup=get_channel_join_keyboard(),
         )
+        await callback.answer()
+        return
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in process_buy_type: {e}")
+    category = callback.data.split("_")[1]
+    logger.debug(f"Selected category: {category}")
+    await callback.message.answer(
+        f"*لطفاً پلن {category} رو انتخاب کن:*",
+        parse_mode="Markdown",
+        reply_markup=get_plan_menu(category),
+    )
     await callback.answer()
 
 
 @router.callback_query(lambda c: c.data.startswith("select_"))
 async def process_plan_selection(callback: CallbackQuery, bot: Bot):
-    user_id = callback.from_user.id
+    logger.info(
+        f"Received select callback: {callback.data} from user {callback.from_user.id}"
+    )
+    user_id = str(callback.from_user.id)
     if not await check_channel_membership(bot, user_id):
-        if callback.message is not None:
-            await callback.message.reply(
-                f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
-                parse_mode="Markdown",
-            )
-        return
-    try:
-        if callback.message is not None:
-            await bot.edit_message_reply_markup(
-                chat_id=callback.message.chat.id,
-                message_id=callback.message.message_id,
-                reply_markup=None,
-            )
-    except TelegramBadRequest as e:
-        logger.warning(
-            f"Failed to edit reply markup in process_plan_selection: {str(e)}"
+        await callback.message.answer(
+            f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
+            parse_mode="Markdown",
+            reply_markup=get_channel_join_keyboard(),
         )
-    if not callback.data:
-        if callback.message is not None:
-            await callback.message.answer(
-                "❌ *خطا: داده‌ای برای پردازش وجود ندارد!*",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu_inline(),
-            )
-        return
-    plan_id = callback.data.replace("select_", "")  # مثلاً volume_180gb_3m
-    plan = get_plan_by_id(plan_id)
-    if not plan:
-        if callback.message is not None:
-            await callback.message.answer(
-                "❌ *پلن نامعتبر است!*",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu_inline(),
-            )
-        return
-    if plan["price"] == 0:
-        username = f"user_{uuid4().hex[:8]}"
-        user_info = await create_user(
-            username,
-            plan["data_limit"],
-            plan["expire_days"],
-            plan["users"],
-            user_id,
-        )
-        if user_info:
-            token = user_info["subscription_url"].split("/")[-2]
-            await save_user_token(user_id, token, username)
-            if callback.message is not None:
-                await callback.message.answer(
-                    f"اکانت تست شما ایجاد شد! 🎉\n"
-                    f"👤 *نام کاربری*: {username}\n"
-                    f"📈 *حجم*: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
-                    f"⏳ *مدت*: {plan['expire_days']} روز\n"
-                    f"🔗 *لینک اشتراک*: {user_info['subscription_url']}\n"
-                    f"لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن.",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_menu(),
-                )
-        else:
-            if callback.message is not None:
-                await callback.message.answer(
-                    "❌ *خطا در ایجاد اکانت تست!*",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_menu(),
-                )
         await callback.answer()
         return
-    order_id = str(uuid4())
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Failed to delete message in process_plan_selection: {e}")
+    plan_id = callback.data.replace("select_", "")
+    logger.debug(f"Selected plan_id: {plan_id}")
+    plan = get_plan_by_id(plan_id)
+    if not plan:
+        logger.error(f"Invalid plan_id: {plan_id}")
+        await callback.message.answer(
+            "❌ *پلن نامعتبر است!*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
+        await callback.answer()
+        return
+    order_id = str(uuid.uuid4())
     try:
         await save_order(user_id, order_id, plan_id, plan["price"])
-        if callback.message is not None:
-            await callback.message.answer(
-                f"شما پلن *{plan['name']}* رو انتخاب کردی:\n"
-                f"📈 *حجم*: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
-                f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
-                f"💸 *مبلغ*: {plan['price']} تومان\n\n"
-                f"لطفاً مبلغ رو به شماره کارت زیر واریز کن و رسید رو ظرف 30 دقیقه بفرست:\n"
-                f"💳 *شماره کارت*: `{CARD_NUMBER}` (به نام {CARD_HOLDER})\n\n"
-                f"برای ارسال رسید، کافیه عکس رسید رو همینجا بفرستی.",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu(),
-            )
+        await callback.message.answer(
+            f"شما پلن *{plan['name']}* رو انتخاب کردی:\n"
+            f"📈 *حجم*: {plan['data_limit'] / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
+            f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
+            f"💸 *مبلغ*: {plan['price']} تومان\n\n"
+            f"لطفاً مبلغ رو به شماره کارت زیر واریز کن و رسید رو ظرف 30 دقیقه بفرست:\n"
+            f"💳 *شماره کارت*: `{CARD_NUMBER}` (به نام {CARD_HOLDER})\n\n"
+            f"برای ارسال رسید، کافیه عکس رسید رو همینجا بفرستی.",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
     except Exception as e:
         logger.error(f"Failed to save order for user {user_id}: {e}")
-        if callback.message is not None:
-            await callback.message.answer(
-                "❌ *خطا در ثبت سفارش! لطفاً دوباره امتحان کنید.*",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu(),
-            )
+        await callback.message.answer(
+            "❌ *خطا در ثبت سفارش! لطفاً دوباره امتحان کنید.*",
+            parse_mode="Markdown",
+            reply_markup=get_main_menu(),
+        )
     await callback.answer()
