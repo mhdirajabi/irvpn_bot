@@ -107,9 +107,8 @@ async def process_buy_type(callback: CallbackQuery, bot: Bot):
         )
     if callback.data:
         category = callback.data.split("_")[1]
-        navigator = callback.data.split("_")[0]
         logger.debug(f"Selected category: {category}")
-        if category == "back" and navigator == "main":
+        if category == "back":
             if callback.message:
                 await callback.message.answer(
                     "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
