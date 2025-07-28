@@ -15,7 +15,7 @@ def get_buy_menu():
         ],
         [
             InlineKeyboardButton(
-                text="↩️ بازگشت به منوی اصلی", callback_data="main_back"
+                text="↩️ بازگشت به منوی اصلی", callback_data="buy_back_main"
             ),
         ],
     ]

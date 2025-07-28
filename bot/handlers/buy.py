@@ -109,13 +109,6 @@ async def process_buy_type(callback: CallbackQuery, bot: Bot):
         category = callback.data.split("_")[1]
         navigator = callback.data.split("_")[0]
         logger.debug(f"Selected category: {category}")
-        # if category == "back" and navigator == "buy":
-        #     if callback.message:
-        #         await callback.message.answer(
-        #             "*لطفاً نوع اکانت رو انتخاب کن:*",
-        #             parse_mode="Markdown",
-        #             reply_markup=get_buy_menu(),
-        #         )
         if category == "back" and navigator == "main":
             if callback.message:
                 await callback.message.answer(
