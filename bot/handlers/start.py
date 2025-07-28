@@ -53,13 +53,15 @@ async def check_membership(callback: CallbackQuery, bot: Bot):
     logger.debug(
         f"Received callback: check_membership from user {callback.from_user.id}"
     )
-    try:
-        if callback.message is not None:
+    if isinstance(callback.message, Message):
+        try:
             await bot.delete_message(
                 chat_id=callback.message.chat.id, message_id=callback.message.message_id
             )
-    except TelegramBadRequest as e:
-        logger.warning(f"Failed to delete message in check_membership: {str(e)}")
+        except TelegramBadRequest as e:
+            logger.warning(f"Failed to delete message in check_membership: {str(e)}")
+    else:
+        logger.warning("Callback message is not of type Message, skipping deletion.")
 
     user_id = callback.from_user.id
     if await check_channel_membership(bot, user_id):
