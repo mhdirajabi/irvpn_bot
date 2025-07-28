@@ -9,6 +9,7 @@ from keyboards.buy_menu import get_buy_menu, get_plan_menu
 from keyboards.main_menu import (
     get_channel_join_keyboard,
     get_main_menu,
+    get_main_menu_inline,
 )
 from services.check_channel_membership import check_channel_membership
 from services.order_service import (
@@ -106,13 +107,21 @@ async def process_buy_type(callback: CallbackQuery, bot: Bot):
         )
     if callback.data:
         category = callback.data.split("_")[1]
+        navigator = callback.data.split("_")[0]
         logger.debug(f"Selected category: {category}")
-        if category == "back":
+        # if category == "back" and navigator == "buy":
+        #     if callback.message:
+        #         await callback.message.answer(
+        #             "*لطفاً نوع اکانت رو انتخاب کن:*",
+        #             parse_mode="Markdown",
+        #             reply_markup=get_buy_menu(),
+        #         )
+        if category == "back" and navigator == "main":
             if callback.message:
                 await callback.message.answer(
-                    "*لطفاً نوع اکانت رو انتخاب کن:*",
+                    "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
                     parse_mode="Markdown",
-                    reply_markup=get_buy_menu(),
+                    reply_markup=get_main_menu_inline(),
                 )
         else:
             if callback.message:

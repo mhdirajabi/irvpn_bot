@@ -91,28 +91,32 @@ async def check_membership(callback: CallbackQuery, bot: Bot):
     await callback.answer()
 
 
-@router.callback_query(lambda c: c.data == "back_to_main")
-async def back_to_main(callback: CallbackQuery, bot: Bot):
-    logger.debug(f"Received callback: back_to_main from user {callback.from_user.id}")
-    try:
-        if callback.message is not None:
-            await bot.delete_message(
-                chat_id=callback.message.chat.id, message_id=callback.message.message_id
-            )
-    except TelegramBadRequest as e:
-        logger.warning(f"Failed to delete message in back_to_main: {str(e)}")
-    try:
-        if callback.message is not None:
-            await callback.message.answer(
-                "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu_inline(),
-            )
-    except Exception:
-        if callback.message is not None:
-            await callback.message.answer(
-                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu(),
-            )
-    await callback.answer()
+# @router.callback_query(lambda c: c.data == "back_to_main")
+# async def back_to_main(callback: CallbackQuery, bot: Bot):
+#     logger.debug(f"Received callback: back_to_main from user {callback.from_user.id}")
+
+#     if isinstance(callback.message, Message):
+#         try:
+#             await bot.delete_message(
+#                 chat_id=callback.message.chat.id, message_id=callback.message.message_id
+#             )
+#         except TelegramBadRequest as e:
+#             logger.warning(f"Failed to delete message in back_to_main: {str(e)}")
+#     else:
+#         logger.warning("Callback message is not of type Message, skipping deletion.")
+
+#     try:
+#         if callback.message is not None:
+#             await callback.message.answer(
+#                 "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
+#                 parse_mode="Markdown",
+#                 reply_markup=get_main_menu_inline(),
+#             )
+#     except Exception:
+#         if callback.message is not None:
+#             await callback.message.answer(
+#                 "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+#                 parse_mode="Markdown",
+#                 reply_markup=get_main_menu(),
+#             )
+#     await callback.answer()
