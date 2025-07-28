@@ -53,6 +53,7 @@ async def check_membership(callback: CallbackQuery, bot: Bot):
     logger.debug(
         f"Received callback: check_membership from user {callback.from_user.id}"
     )
+
     if isinstance(callback.message, Message):
         try:
             await bot.delete_message(
@@ -64,6 +65,7 @@ async def check_membership(callback: CallbackQuery, bot: Bot):
         logger.warning("Callback message is not of type Message, skipping deletion.")
 
     user_id = callback.from_user.id
+
     if await check_channel_membership(bot, user_id):
         is_admin_user = await is_admin(user_id)
         reply = (
@@ -79,13 +81,13 @@ async def check_membership(callback: CallbackQuery, bot: Bot):
             await callback.message.answer(
                 reply, parse_mode="Markdown", reply_markup=get_main_menu()
             )
-        if callback.message is not None:
-            await callback.message.answer(
-                "⚠️ *هنوز توی کانال ما عضو نشدی!* 😔\n"
-                f"لطفاً توی {CHANNEL_ID} عضو شو و دوباره امتحان کن!",
-                parse_mode="Markdown",
-                reply_markup=get_channel_join_keyboard(),
-            )
+    elif callback.message is not None:
+        await callback.message.answer(
+            "⚠️ *هنوز توی کانال ما عضو نشدی!* 😔\n"
+            f"لطفاً توی {CHANNEL_ID} عضو شو و دوباره امتحان کن!",
+            parse_mode="Markdown",
+            reply_markup=get_channel_join_keyboard(),
+        )
     await callback.answer()
 
 
