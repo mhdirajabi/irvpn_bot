@@ -109,15 +109,7 @@ async def process_main_type(callback: CallbackQuery, bot: Bot):
             )
         await callback.answer()
         return
-    # if isinstance(callback.message, Message):
-    #     try:
-    #         await callback.message.delete()
-    #     except TelegramBadRequest as e:
-    #         logger.warning(f"Failed to delete message in process_main_type: {e}")
-    # else:
-    #     logger.warning(
-    #         "callback.message is not deletable (InaccessibleMessage or None)"
-    #     )
+
     if callback.data:
         category = callback.data.split("_")[1]
         logger.debug(f"Selected category: {category}")
@@ -135,8 +127,9 @@ async def process_main_type(callback: CallbackQuery, bot: Bot):
                     )
         elif category == "buy":
             try:
-                # await callback.message.delete()
-                await buy_command(callback.message, bot)
+                if isinstance(callback.message, Message):
+                    await callback.message.delete()
+                    await buy_command(callback.message, bot)
             except Exception as e:
                 logger.error(f"Error in main_buy: {str(e)}")
                 if callback.message:
@@ -146,8 +139,9 @@ async def process_main_type(callback: CallbackQuery, bot: Bot):
                     )
         elif category == "renew":
             try:
-                # await callback.message.delete()
-                await renew_command(callback.message, bot)
+                if isinstance(callback.message, Message):
+                    await callback.message.delete()
+                    await renew_command(callback.message, bot)
             except Exception as e:
                 logger.error(f"Error in main_renew: {str(e)}")
                 if callback.message:
@@ -157,8 +151,9 @@ async def process_main_type(callback: CallbackQuery, bot: Bot):
                     )
         elif category == "getlink":
             try:
-                # await callback.message.delete()
-                await getlink_command(callback.message, bot)
+                if isinstance(callback.message, Message):
+                    await callback.message.delete()
+                    await getlink_command(callback.message, bot)
             except Exception as e:
                 logger.error(f"Error in main_getlink: {str(e)}")
                 if callback.message:
