@@ -45,6 +45,10 @@ def get_plan_menu(category: str):
         row = [InlineKeyboardButton(text=text, callback_data=callback_data)]
         keyboard.append(row)
     keyboard.append(
-        [InlineKeyboardButton(text="↩️ بازگشت به منوی قبلی", callback_data="buy_back")]
+        [
+            InlineKeyboardButton(
+                text="↩️ بازگشت به منوی قبلی", callback_data="select_back"
+            )
+        ]
     )
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
