@@ -109,15 +109,15 @@ async def process_main_type(callback: CallbackQuery, bot: Bot):
             )
         await callback.answer()
         return
-    if isinstance(callback.message, Message):
-        try:
-            await callback.message.delete()
-        except TelegramBadRequest as e:
-            logger.warning(f"Failed to delete message in process_main_type: {e}")
-    else:
-        logger.warning(
-            "callback.message is not deletable (InaccessibleMessage or None)"
-        )
+    # if isinstance(callback.message, Message):
+    #     try:
+    #         await callback.message.delete()
+    #     except TelegramBadRequest as e:
+    #         logger.warning(f"Failed to delete message in process_main_type: {e}")
+    # else:
+    #     logger.warning(
+    #         "callback.message is not deletable (InaccessibleMessage or None)"
+    #     )
     if callback.data:
         category = callback.data.split("_")[1]
         logger.debug(f"Selected category: {category}")
