@@ -123,8 +123,9 @@ async def process_main_type(callback: CallbackQuery, bot: Bot):
         logger.debug(f"Selected category: {category}")
         if category == "status":
             try:
-                # await callback.message.delete()
-                await status_command(callback.message, bot)
+                if isinstance(callback.message, Message):
+                    await callback.message.delete()
+                    await status_command(callback.message, bot)
             except Exception as e:
                 logger.error(f"Error in main_status: {str(e)}")
                 if callback.message:
