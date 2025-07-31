@@ -7,7 +7,7 @@ from handlers.getlink import getlink_command
 from handlers.renew import renew_command
 from handlers.buy import buy_command
 from handlers.status import status_command
-from config import ADMIN_TELEGRAM_ID, CHANNEL_ID
+from config import CHANNEL_ID
 from keyboards.main_menu import (
     get_admin_menu,
     get_channel_join_keyboard,
@@ -16,11 +16,9 @@ from keyboards.main_menu import (
 from services.check_channel_membership import check_channel_membership
 from utils.logger import logger
 
+from .admin import is_admin
+
 router = Router()
-
-
-async def is_admin(user_id: int) -> bool:
-    return user_id == ADMIN_TELEGRAM_ID
 
 
 @router.message(Command("start"))

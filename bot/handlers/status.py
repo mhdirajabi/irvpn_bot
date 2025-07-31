@@ -2,13 +2,14 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
-from handlers.admin import is_admin
 from config import CHANNEL_ID
 from keyboards.main_menu import get_admin_menu, get_channel_join_keyboard, get_main_menu
 from services.check_channel_membership import check_channel_membership
 from services.user_service import get_user_by_telegram_id
 from utils.formatters import format_data_limit, format_expire_date
 from utils.logger import logger
+
+from .admin import is_admin
 
 router = Router()
 

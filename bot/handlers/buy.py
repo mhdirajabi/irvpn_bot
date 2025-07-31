@@ -4,7 +4,6 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
-from handlers.start import is_admin
 from config import CARD_HOLDER, CARD_NUMBER, CHANNEL_ID
 from keyboards.buy_menu import get_buy_menu, get_plan_menu
 from keyboards.main_menu import (
@@ -20,6 +19,8 @@ from services.order_service import (
 )
 from utils.logger import logger
 from utils.plans import get_plan_by_id
+
+from .admin import is_admin
 
 router = Router()
 
