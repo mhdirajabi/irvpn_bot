@@ -15,7 +15,7 @@ def get_buy_menu():
         ],
         [
             InlineKeyboardButton(
-                text="↩️ بازگشت به منوی اصلی", callback_data="buy_back_main"
+                text="↩️ بازگشت به منوی اصلی", callback_data="buy_back"
             ),
         ],
     ]
@@ -29,14 +29,14 @@ def get_plan_menu(category: str):
     for i, plan in enumerate(plans):
         if plan["expire_days"] != 0:
             text = (
-                f"📊 حجم {plan['data_limit']} // 1073741824 گیگ - {plan['expire_days']} روزه - {plan['price']} تومان"
+                f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - {plan['expire_days']} روزه - {plan['price']} تومان"
                 if plan["data_limit"]
                 else f"♾️ نامحدود {plan['users']} کاربره - {plan['expire_days']} روزه"
             )
         else:
             # For lifetime plans, we can use a different text format
             text = (
-                f"📊 حجم {plan['data_limit']} // 1073741824 گیگ - لایف‌تایم - {plan['price']} تومان"
+                f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - لایف‌تایم - {plan['price']} تومان"
                 if plan["data_limit"]
                 else f"♾️ نامحدود {plan['users']} کاربره - {plan['expire_days']} روزه"
             )
