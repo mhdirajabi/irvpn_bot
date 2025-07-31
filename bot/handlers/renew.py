@@ -4,8 +4,15 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
+from handlers.start import is_admin
 from config import CARD_HOLDER, CARD_NUMBER, CHANNEL_ID
-from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
+from keyboards.main_menu import (
+    get_admin_menu,
+    get_admin_menu_inline,
+    get_channel_join_keyboard,
+    get_main_menu,
+    get_main_menu_inline,
+)
 from keyboards.renew_menu import get_renew_menu, get_renew_plan_menu
 from services.check_channel_membership import check_channel_membership
 from services.order_service import save_order
@@ -27,6 +34,7 @@ async def renew_command(message: Message, bot: Bot):
         )
         return
     user_id = message.from_user.id
+    is_admin_user = await is_admin(user_id)
     logger.info(f"Renew command received from user {user_id}")
     if not await check_channel_membership(bot, user_id):
         await message.reply(
@@ -37,10 +45,18 @@ async def renew_command(message: Message, bot: Bot):
         return
     user = await get_user_by_telegram_id(user_id)
     if not user:
-        await message.reply(
-            "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
-            parse_mode="Markdown",
-            reply_markup=get_main_menu(),
+        (
+            await message.reply(
+                "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                parse_mode="Markdown",
+                reply_markup=get_main_menu(),
+            )
+            if not is_admin_user
+            else await message.reply(
+                "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                parse_mode="Markdown",
+                reply_markup=get_admin_menu(),
+            )
         )
         return
     await message.reply(
@@ -62,6 +78,8 @@ async def main_renew(callback: CallbackQuery, bot: Bot):
         logger.warning("Callback message is not a Message instance, cannot delete.")
 
     user_id = callback.from_user.id
+    is_admin_user = await is_admin(user_id)
+
     if not await check_channel_membership(bot, user_id):
         if callback.message:
             await callback.message.answer(
@@ -74,10 +92,18 @@ async def main_renew(callback: CallbackQuery, bot: Bot):
     user = await get_user_by_telegram_id(user_id)
     if not user:
         if callback.message:
-            await callback.message.answer(
-                "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu(),
+            (
+                await callback.message.answer(
+                    "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_menu(),
+                )
+                if not is_admin_user
+                else await callback.message.answer(
+                    "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                    parse_mode="Markdown",
+                    reply_markup=get_admin_menu(),
+                )
             )
             await callback.answer()
             return
@@ -96,6 +122,8 @@ async def process_renew_type(callback: CallbackQuery, bot: Bot):
         f"Received renew callback: {callback.data} from user {callback.from_user.id}"
     )
     user_id = callback.from_user.id
+    is_admin_user = await is_admin(user_id)
+
     if not await check_channel_membership(bot, user_id):
         if callback.message:
             await callback.message.answer(
@@ -108,28 +136,45 @@ async def process_renew_type(callback: CallbackQuery, bot: Bot):
     if isinstance(callback.message, Message):
         try:
             await callback.message.delete()
+            if callback.data:
+                category = callback.data.split("_")[1]
+                if category == "volume":
+                    plan_dsc = "**حجمی**"
+                elif category == "unlimited":
+                    plan_dsc = "**نامحدود**"
+                elif category == "test":
+                    plan_dsc = "**تست**"
+                else:
+                    plan_dsc = "**نامشخص**"
+                logger.debug(f"Selected category: {category}")
+                if category == "back":
+                    if callback.message:
+                        (
+                            await callback.message.answer(
+                                "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
+                                parse_mode="Markdown",
+                                reply_markup=get_main_menu_inline(),
+                            )
+                            if not is_admin_user
+                            else await callback.message.answer(
+                                "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
+                                parse_mode="Markdown",
+                                reply_markup=get_admin_menu_inline(),
+                            )
+                        )
+                else:
+                    if callback.message:
+                        await callback.message.answer(
+                            f"*لطفاً پلن {plan_dsc} برای تمدید رو انتخاب کن:*",
+                            parse_mode="Markdown",
+                            reply_markup=get_renew_plan_menu(category),
+                        )
         except TelegramBadRequest as e:
             logger.warning(f"Failed to delete message in process_renew_type: {e}")
     else:
         logger.warning("Callback message is not a Message instance, cannot delete.")
-    if callback.data:
-        category = callback.data.split("_")[1]
-        logger.debug(f"Selected category: {category}")
-        if category == "back":
-            if callback.message:
-                await callback.message.answer(
-                    "*لطفاً نوع اکانت برای تمدید رو انتخاب کن:*",
-                    parse_mode="Markdown",
-                    reply_markup=get_renew_menu(),
-                )
-        else:
-            if callback.message:
-                await callback.message.answer(
-                    f"*لطفاً پلن {category} برای تمدید رو انتخاب کن:*",
-                    parse_mode="Markdown",
-                    reply_markup=get_renew_plan_menu(category),
-                )
-        await callback.answer()
+
+    await callback.answer()
 
 
 @router.callback_query(lambda c: c.data.startswith("renewselect_"))
@@ -138,6 +183,7 @@ async def process_renew_plan_selection(callback: CallbackQuery, bot: Bot):
         f"Received renewselect callback: {callback.data} from user {callback.from_user.id}"
     )
     user_id = callback.from_user.id
+    is_admin_user = await is_admin(user_id)
     if not await check_channel_membership(bot, user_id):
         if callback.message:
             await callback.message.answer(
@@ -158,43 +204,84 @@ async def process_renew_plan_selection(callback: CallbackQuery, bot: Bot):
         logger.warning("Callback message is not a Message instance, cannot delete.")
 
     if callback.data:
-        plan_id = callback.data.replace("renewselect_", "")
-        logger.debug(f"Selected plan_id: {plan_id}")
-        plan = get_plan_by_id(plan_id)
-        if not plan:
-            logger.error(f"Invalid plan_id: {plan_id}")
+        flag = callback.data.split("_")[1]
+        if flag == "back":
             if callback.message:
                 await callback.message.answer(
-                    "❌ *پلن نامعتبر است!*",
+                    "*لطفاً نوع اکانت برای تمدید رو انتخاب کن:*",
                     parse_mode="Markdown",
-                    reply_markup=get_main_menu(),
+                    reply_markup=get_renew_menu(),
                 )
-                await callback.answer()
-                return
         else:
-            order_id = str(uuid.uuid4())
-            try:
-                await save_order(
-                    user_id, order_id, plan_id, int(plan["price"]), is_renewal=True
-                )
+            plan_id = callback.data.replace("renewselect_", "")
+            logger.debug(f"Selected plan_id: {plan_id}")
+            plan = get_plan_by_id(plan_id)
+            if not plan:
+                logger.error(f"Invalid plan_id: {plan_id}")
                 if callback.message:
-                    await callback.message.answer(
-                        f"شما پلن *{plan['name']}* برای تمدید انتخاب کردی:\n"
-                        f"📈 *حجم*: {int(plan['data_limit']) / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
-                        f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
-                        f"💸 *مبلغ*: {plan['price']} تومان\n\n"
-                        f"لطفاً مبلغ رو به شماره کارت زیر واریز کن و رسید رو ظرف 30 دقیقه بفرست:\n"
-                        f"💳 *شماره کارت*: `{CARD_NUMBER}` (به نام {CARD_HOLDER})\n\n"
-                        f"برای ارسال رسید، کافیه عکس رسید رو همینجا بفرستی.",
-                        parse_mode="Markdown",
-                        reply_markup=get_main_menu(),
+                    (
+                        await callback.message.answer(
+                            "❌ *پلن نامعتبر است!*",
+                            parse_mode="Markdown",
+                            reply_markup=get_main_menu(),
+                        )
+                        if not is_admin_user
+                        else await callback.message.answer(
+                            "❌ *پلن نامعتبر است!*",
+                            parse_mode="Markdown",
+                            reply_markup=get_admin_menu(),
+                        )
                     )
-            except Exception as e:
-                logger.error(f"Failed to save renewal order for user {user_id}: {e}")
-                if callback.message:
-                    await callback.message.answer(
-                        "❌ *خطا در ثبت سفارش تمدید! لطفاً دوباره امتحان کنید.*",
-                        parse_mode="Markdown",
-                        reply_markup=get_main_menu(),
+                    await callback.answer()
+                    return
+            else:
+                order_id = str(uuid.uuid4())
+                try:
+                    await save_order(
+                        user_id, order_id, plan_id, int(plan["price"]), is_renewal=True
                     )
-            await callback.answer()
+                    if callback.message:
+                        (
+                            await callback.message.answer(
+                                f"شما پلن *{plan['name']}* برای تمدید انتخاب کردی:\n"
+                                f"📈 *حجم*: {int(plan['data_limit']) / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
+                                f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
+                                f"💸 *مبلغ*: {plan['price']} تومان\n\n"
+                                f"لطفاً مبلغ رو به شماره کارت زیر واریز کن و رسید رو ظرف 30 دقیقه بفرست:\n"
+                                f"💳 *شماره کارت*: `{CARD_NUMBER}` (به نام {CARD_HOLDER})\n\n"
+                                f"برای ارسال رسید، کافیه عکس رسید رو همینجا بفرستی.",
+                                parse_mode="Markdown",
+                                reply_markup=get_main_menu(),
+                            )
+                            if not is_admin_user
+                            else await callback.message.answer(
+                                f"شما پلن *{plan['name']}* برای تمدید انتخاب کردی:\n"
+                                f"📈 *حجم*: {int(plan['data_limit']) / 1073741824 if plan['data_limit'] else '♾️ نامحدود'} گیگابایت\n"
+                                f"⏳ *مدت*: {plan['expire_days'] if plan['expire_days'] else 'لایف‌تایم'} روز\n"
+                                f"💸 *مبلغ*: {plan['price']} تومان\n\n"
+                                f"لطفاً مبلغ رو به شماره کارت زیر واریز کن و رسید رو ظرف 30 دقیقه بفرست:\n"
+                                f"💳 *شماره کارت*: `{CARD_NUMBER}` (به نام {CARD_HOLDER})\n\n"
+                                f"برای ارسال رسید، کافیه عکس رسید رو همینجا بفرستی.",
+                                parse_mode="Markdown",
+                                reply_markup=get_admin_menu(),
+                            )
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to save renewal order for user {user_id}: {e}"
+                    )
+                    if callback.message:
+                        (
+                            await callback.message.answer(
+                                "❌ *خطا در ثبت سفارش تمدید! لطفاً دوباره امتحان کنید.*",
+                                parse_mode="Markdown",
+                                reply_markup=get_main_menu(),
+                            )
+                            if not is_admin_user
+                            else await callback.message.answer(
+                                "❌ *خطا در ثبت سفارش تمدید! لطفاً دوباره امتحان کنید.*",
+                                parse_mode="Markdown",
+                                reply_markup=get_admin_menu(),
+                            )
+                        )
+        await callback.answer()

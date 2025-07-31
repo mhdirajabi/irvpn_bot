@@ -2,8 +2,9 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
+from handlers.admin import is_admin
 from config import CHANNEL_ID
-from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
+from keyboards.main_menu import get_admin_menu, get_channel_join_keyboard, get_main_menu
 from services.check_channel_membership import check_channel_membership
 from services.user_service import get_user_by_telegram_id
 from utils.formatters import format_data_limit, format_expire_date
@@ -23,6 +24,7 @@ async def status_command(message: Message, bot: Bot):
         )
         return
     user_id = message.from_user.id
+    is_admin_user = await is_admin(user_id)
     if not await check_channel_membership(bot, user_id):
         await message.reply(
             f"⚠️ *لطفاً ابتدا در کانال ما عضو شوید*: {CHANNEL_ID}",
@@ -33,27 +35,55 @@ async def status_command(message: Message, bot: Bot):
     try:
         user = await get_user_by_telegram_id(user_id)
         if not user:
+            (
+                await message.answer(
+                    "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_menu(),
+                )
+                if not is_admin_user
+                else await message.answer(
+                    "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                    parse_mode="Markdown",
+                    reply_markup=get_admin_menu(),
+                )
+            )
+            return
+        (
             await message.answer(
-                "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                f"*وضعیت اکانت شما:* 📋\n"
+                f"👤 *نام کاربری*: {user['username']}\n"
+                f"📈 *حجم*: {format_data_limit(user['data_limit'])}\n"
+                f"⏳ *انقضا*: {format_expire_date(user['expire'])}\n"
+                f"✅ *وضعیت*: {user['status']}",
                 parse_mode="Markdown",
                 reply_markup=get_main_menu(),
             )
-            return
-        await message.answer(
-            f"*وضعیت اکانت شما:* 📋\n"
-            f"👤 *نام کاربری*: {user['username']}\n"
-            f"📈 *حجم*: {format_data_limit(user['data_limit'])}\n"
-            f"⏳ *انقضا*: {format_expire_date(user['expire'])}\n"
-            f"✅ *وضعیت*: {user['status']}",
-            parse_mode="Markdown",
-            reply_markup=get_main_menu(),
+            if not is_admin_user
+            else await message.answer(
+                f"*وضعیت اکانت شما:* 📋\n"
+                f"👤 *نام کاربری*: {user['username']}\n"
+                f"📈 *حجم*: {format_data_limit(user['data_limit'])}\n"
+                f"⏳ *انقضا*: {format_expire_date(user['expire'])}\n"
+                f"✅ *وضعیت*: {user['status']}",
+                parse_mode="Markdown",
+                reply_markup=get_admin_menu(),
+            )
         )
     except Exception as e:
         logger.error(f"Failed to fetch user status for telegram_id={user_id}: {e}")
-        await message.answer(
-            "❌ *خطا در دریافت اطلاعات اکانت!*",
-            parse_mode="Markdown",
-            reply_markup=get_main_menu(),
+        (
+            await message.answer(
+                "❌ *خطا در دریافت اطلاعات اکانت!*",
+                parse_mode="Markdown",
+                reply_markup=get_main_menu(),
+            )
+            if not is_admin_user
+            else await message.answer(
+                "❌ *خطا در دریافت اطلاعات اکانت!*",
+                parse_mode="Markdown",
+                reply_markup=get_admin_menu(),
+            )
         )
 
 
@@ -69,6 +99,7 @@ async def main_status(callback: CallbackQuery, bot: Bot):
         logger.warning("Callback message is not a Message instance, cannot delete.")
 
     user_id = callback.from_user.id
+    is_admin_user = await is_admin(user_id)
     if not await check_channel_membership(bot, user_id):
         if callback.message is not None:
             await callback.message.answer(
@@ -82,29 +113,57 @@ async def main_status(callback: CallbackQuery, bot: Bot):
         user = await get_user_by_telegram_id(user_id)
         if not user:
             if callback.message is not None:
-                await callback.message.answer(
-                    "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_menu(),
+                (
+                    await callback.message.answer(
+                        "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                        parse_mode="Markdown",
+                        reply_markup=get_main_menu(),
+                    )
+                    if not is_admin_user
+                    else await callback.message.answer(
+                        "⚠️ *هیچ اکانتی برای شما پیدا نشد!*",
+                        parse_mode="Markdown",
+                        reply_markup=get_admin_menu(),
+                    )
                 )
             await callback.answer()
             return
         if callback.message is not None:
-            await callback.message.answer(
-                f"*وضعیت اکانت شما:* 📋\n"
-                f"👤 *نام کاربری*: {user['username']}\n"
-                f"📈 *حجم*: {format_data_limit(user['data_limit'])}\n"
-                f"⏳ *انقضا*: {format_expire_date(user['expire'])}\n"
-                f"✅ *وضعیت*: {user['status']}",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu(),
+            (
+                await callback.message.answer(
+                    f"*وضعیت اکانت شما:* 📋\n"
+                    f"👤 *نام کاربری*: {user['username']}\n"
+                    f"📈 *حجم*: {format_data_limit(user['data_limit'])}\n"
+                    f"⏳ *انقضا*: {format_expire_date(user['expire'])}\n"
+                    f"✅ *وضعیت*: {user['status']}",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_menu(),
+                )
+                if not is_admin_user
+                else await callback.message.answer(
+                    f"*وضعیت اکانت شما:* 📋\n"
+                    f"👤 *نام کاربری*: {user['username']}\n"
+                    f"📈 *حجم*: {format_data_limit(user['data_limit'])}\n"
+                    f"⏳ *انقضا*: {format_expire_date(user['expire'])}\n"
+                    f"✅ *وضعیت*: {user['status']}",
+                    parse_mode="Markdown",
+                    reply_markup=get_admin_menu(),
+                )
             )
     except Exception as e:
         logger.error(f"Failed to fetch user status for telegram_id={user_id}: {e}")
         if callback.message is not None:
-            await callback.message.answer(
-                "❌ *خطا در دریافت اطلاعات اکانت!*",
-                parse_mode="Markdown",
-                reply_markup=get_main_menu(),
+            (
+                await callback.message.answer(
+                    "❌ *خطا در دریافت اطلاعات اکانت!*",
+                    parse_mode="Markdown",
+                    reply_markup=get_main_menu(),
+                )
+                if not is_admin_user
+                else await callback.message.answer(
+                    "❌ *خطا در دریافت اطلاعات اکانت!*",
+                    parse_mode="Markdown",
+                    reply_markup=get_admin_menu(),
+                )
             )
     await callback.answer()

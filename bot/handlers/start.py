@@ -2,12 +2,14 @@ from aiogram import Bot, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
+from handlers.admin import adduser_command, servers_command
 from handlers.getlink import getlink_command
 from handlers.renew import renew_command
 from handlers.buy import buy_command
 from handlers.status import status_command
 from config import ADMIN_TELEGRAM_ID, CHANNEL_ID
 from keyboards.main_menu import (
+    get_admin_menu,
     get_channel_join_keyboard,
     get_main_menu,
 )
@@ -42,13 +44,20 @@ async def start_command(message: Message, bot: Bot):
     reply = (
         "*به ربات IRVPN خوش اومدی!* 😊\n"
         "لطفاً یکی از گزینه‌های زیر رو انتخاب کن:\n\n"
-        f"{'*دستورات ادمین*:\n/adduser - ایجاد کاربر جدید\n/servers - مدیریت سرورها\n' if is_admin_user else ''}"
+        f"{'*دستورات ادمین*:\n👤 *ایجاد کاربر جدید*: ساخت اکانت جدید\n🛜 *مدیریت سرورها*: مشاهده وضعیت نودها\n' if is_admin_user else ''}"
         "📊 *وضعیت اکانت*: بررسی وضعیت اشتراک\n"
         "🛒 *خرید اکانت*: خرید اکانت جدید\n"
         "🔄 *تمدید اکانت*: تمدید اشتراک موجود\n"
         "🔗 *دریافت لینک*: دریافت لینک اشتراک"
     )
-    await message.reply(reply, parse_mode="Markdown", reply_markup=get_main_menu())
+    if not is_admin_user:
+        await message.reply(reply, parse_mode="Markdown", reply_markup=get_main_menu())
+    else:
+        await message.reply(
+            reply,
+            parse_mode="Markdown",
+            reply_markup=get_admin_menu(),
+        )
 
 
 @router.callback_query(lambda c: c.data == "check_membership")
@@ -74,15 +83,21 @@ async def check_membership(callback: CallbackQuery, bot: Bot):
         reply = (
             "*خوش اومدی!* 🎉\n"
             "حالا می‌تونی از خدمات ربات استفاده کنی. یه گزینه رو انتخاب کن:\n\n"
-            f"{'*دستورات ادمین*:\n/adduser - ایجاد کاربر جدید\n/servers - مدیریت سرورها\n' if is_admin_user else ''}"
+            f"{'*دستورات ادمین*:\n👤 *ایجاد کاربر جدید*: ساخت اکانت جدید\n🛜 *مدیریت سرورها*: مشاهده وضعیت نودها\n' if is_admin_user else ''}"
             "📊 *وضعیت اکانت*: بررسی وضعیت اشتراک\n"
             "🛒 *خرید اکانت*: خرید اکانت جدید\n"
             "🔄 *تمدید اکانت*: تمدید اشتراک موجود\n"
             "🔗 *دریافت لینک*: دریافت لینک اشتراک"
         )
         if callback.message is not None:
-            await callback.message.answer(
-                reply, parse_mode="Markdown", reply_markup=get_main_menu()
+            (
+                await callback.message.answer(
+                    reply, parse_mode="Markdown", reply_markup=get_admin_menu()
+                )
+                if is_admin_user
+                else await callback.message.answer(
+                    reply, parse_mode="Markdown", reply_markup=get_main_menu()
+                )
             )
     elif callback.message is not None:
         await callback.message.answer(
@@ -115,48 +130,69 @@ async def process_main_type(callback: CallbackQuery, bot: Bot):
             if callback.data:
                 category = callback.data.split("_")[1]
                 logger.debug(f"Selected category: {category}")
-                if category == "status":
-                    try:
-                        await status_command(callback.message, bot)
-                    except Exception as e:
-                        logger.error(f"Error in main_status: {str(e)}")
-                        if callback.message:
-                            await callback.message.answer(
-                                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                                parse_mode="Markdown",
-                            )
-                elif category == "buy":
-                    try:
-                        await buy_command(callback.message, bot)
-                    except Exception as e:
-                        logger.error(f"Error in main_buy: {str(e)}")
-                        if callback.message:
-                            await callback.message.answer(
-                                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                                parse_mode="Markdown",
-                            )
-                elif category == "renew":
-                    try:
-                        await renew_command(callback.message, bot)
-                    except Exception as e:
-                        logger.error(f"Error in main_renew: {str(e)}")
-                        if callback.message:
-                            await callback.message.answer(
-                                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                                parse_mode="Markdown",
-                            )
-                elif category == "getlink":
-                    try:
-                        await getlink_command(callback.message, bot)
-                    except Exception as e:
-                        logger.error(f"Error in main_getlink: {str(e)}")
-                        if callback.message:
-                            await callback.message.answer(
-                                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                                parse_mode="Markdown",
-                            )
+                match category:
+                    case "status":
+                        try:
+                            await status_command(callback.message, bot)
+                        except Exception as e:
+                            logger.error(f"Error in main_status: {str(e)}")
+                            if callback.message:
+                                await callback.message.answer(
+                                    "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                    parse_mode="Markdown",
+                                )
+                    case "buy":
+                        try:
+                            await buy_command(callback.message, bot)
+                        except Exception as e:
+                            logger.error(f"Error in main_buy: {str(e)}")
+                            if callback.message:
+                                await callback.message.answer(
+                                    "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                    parse_mode="Markdown",
+                                )
+                    case "renew":
+                        try:
+                            await renew_command(callback.message, bot)
+                        except Exception as e:
+                            logger.error(f"Error in main_renew: {str(e)}")
+                            if callback.message:
+                                await callback.message.answer(
+                                    "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                    parse_mode="Markdown",
+                                )
+                    case "getlink":
+                        try:
+                            await getlink_command(callback.message, bot)
+                        except Exception as e:
+                            logger.error(f"Error in main_getlink: {str(e)}")
+                            if callback.message:
+                                await callback.message.answer(
+                                    "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                    parse_mode="Markdown",
+                                )
+                    case "adduser":
+                        try:
+                            await adduser_command(callback.message, bot)
+                        except Exception as e:
+                            logger.error(f"Error in main_adduser: {str(e)}")
+                            if callback.message:
+                                await callback.message.answer(
+                                    "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                    parse_mode="Markdown",
+                                )
+                    case "servers":
+                        try:
+                            await servers_command(callback.message, bot)
+                        except Exception as e:
+                            logger.error(f"Error in main_servers: {str(e)}")
+                            if callback.message:
+                                await callback.message.answer(
+                                    "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                    parse_mode="Markdown",
+                                )
         except TelegramBadRequest as e:
-            logger.warning(f"Failed to delete message in process_buy_type: {e}")
+            logger.warning(f"Failed to delete message in process_main_type: {e}")
     else:
         logger.warning(
             "callback.message is not deletable (InaccessibleMessage or None)"

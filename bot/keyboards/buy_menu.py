@@ -27,19 +27,45 @@ def get_plan_menu(category: str):
     plans.sort(key=lambda x: x["price"])
     keyboard = []
     for i, plan in enumerate(plans):
-        if plan["expire_days"] != 0:
-            text = (
-                f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - {plan['expire_days']} روزه - {plan['price']} تومان"
-                if plan["data_limit"]
-                else f"♾️ نامحدود {plan['users']} کاربره - {plan['expire_days']} روزه"
-            )
-        else:
-            # For lifetime plans, we can use a different text format
-            text = (
-                f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - لایف‌تایم - {plan['price']} تومان"
-                if plan["data_limit"]
-                else f"♾️ نامحدود {plan['users']} کاربره - {plan['expire_days']} روزه"
-            )
+        if plan["expire_days"] != 0 and plan["price"] != 0:
+            if plan["users"] == "single":
+                text = (
+                    f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - {plan['expire_days']} روزه - {plan['price']} تومان"
+                    if plan["data_limit"]
+                    else f"♾️ نامحدود تک کاربره - {plan['expire_days']} روزه - {plan['price']} تومان"
+                )
+            else:
+                text = (
+                    f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - {plan['expire_days']} روزه - {plan['price']} تومان"
+                    if plan["data_limit"]
+                    else f"♾️ نامحدود دو کاربره - {plan['expire_days']} روزه - {plan['price']} تومان"
+                )
+        elif plan["expire_days"] == 0:
+            if plan["users"] == "single":
+                text = (
+                    f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - لایف‌تایم - {plan['price']} تومان"
+                    if plan["data_limit"]
+                    else f"♾️ نامحدود تک کاربره - {plan['expire_days']} روزه - {plan['price']} تومان"
+                )
+            else:
+                text = (
+                    f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - لایف‌تایم - {plan['price']} تومان"
+                    if plan["data_limit"]
+                    else f"♾️ نامحدود دو کاربره - {plan['expire_days']} روزه - {plan['price']} تومان"
+                )
+        elif plan["price"] == 0:
+            if plan["users"] == "single":
+                text = (
+                    f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - لایف‌تایم - رایگان"
+                    if plan["data_limit"]
+                    else f"♾️ نامحدود تک کاربره - {plan['expire_days']} روزه - {plan['price']} تومان"
+                )
+            else:
+                text = (
+                    f"📊 حجم {plan['data_limit'] // 1073741824} گیگ - لایف‌تایم - رایگان"
+                    if plan["data_limit"]
+                    else f"♾️ نامحدود دو کاربره - {plan['expire_days']} روزه - {plan['price']} تومان"
+                )
 
         callback_data = f"select_{plan['id']}"
         row = [InlineKeyboardButton(text=text, callback_data=callback_data)]

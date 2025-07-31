@@ -4,7 +4,7 @@ from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery, Message
 from config import ADMIN_TELEGRAM_ID, BOT_TOKEN, CHANNEL_ID
 from handlers.admin import is_admin
-from keyboards.main_menu import get_channel_join_keyboard, get_main_menu
+from keyboards.main_menu import get_admin_menu, get_channel_join_keyboard, get_main_menu
 from keyboards.receipt_menu import get_receipt_admin_menu
 from services.check_channel_membership import check_channel_membership
 from services.order_service import (
@@ -33,7 +33,9 @@ async def handle_receipt(message: Message, bot: Bot):
             reply_markup=get_main_menu(),
         )
         return
+
     user_id = message.from_user.id
+    is_admin_user = await is_admin(user_id)
 
     logger.info(f"Handling receipt for user: {user_id}")
 
@@ -52,12 +54,22 @@ async def handle_receipt(message: Message, bot: Bot):
         if not orders:
             logger.warning(f"No pending orders found for user {user_id}")
             all_orders = await get_orders(user_id)
-            await message.reply(
-                f"⚠️ *هیچ سفارش در حال انتظاری برای شما وجود ندارد!* \n"
-                f"لطفاً مطمئن شوید که سفارش خود را ثبت کرده‌اید.\n"
-                f"وضعیت سفارش‌ها: {all_orders if all_orders else 'هیچ سفارشی یافت نشد'}",
-                parse_mode="markdown",
-                reply_markup=get_main_menu(),
+            (
+                await message.reply(
+                    f"⚠️ *هیچ سفارش در حال انتظاری برای شما وجود ندارد!* \n"
+                    f"لطفاً مطمئن شوید که سفارش خود را ثبت کرده‌اید.\n"
+                    f"وضعیت سفارش‌ها: {all_orders if all_orders else 'هیچ سفارشی یافت نشد'}",
+                    parse_mode="markdown",
+                    reply_markup=get_main_menu(),
+                )
+                if not is_admin_user
+                else await message.reply(
+                    f"⚠️ *هیچ سفارش در حال انتظاری برای شما وجود ندارد!* \n"
+                    f"لطفاً مطمئن شوید که سفارش خود را ثبت کرده‌اید.\n"
+                    f"وضعیت سفارش‌ها: {all_orders if all_orders else 'هیچ سفارشی یافت نشد'}",
+                    parse_mode="markdown",
+                    reply_markup=get_admin_menu(),
+                )
             )
             return
         order = sorted(orders, key=lambda x: x["created_at"], reverse=True)[0]
@@ -88,24 +100,40 @@ async def handle_receipt(message: Message, bot: Bot):
                 f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
             )
             caption = (
-                f"رسید پرداخت برای سفارش {order_id}: \n"
-                f"کاربر: {user_id}\n"
-                f"پلن: {plan['name']}\n"
-                f"مبلغ: {plan['price']} تومان"
+                f"*رسید پرداخت برای سفارش* _{order_id}_: \n"
+                f"*کاربر*: _{user_id}_\n"
+                f"*پلن*: {plan['name']}\n"
+                f"*مبلغ*: {plan['price']} تومان\n\n"
+                f"*لینک رسید*: {receipt_url}"
             )
             logger.debug(
                 f"Caption: {caption}, Length: {len(caption.encode('utf-8'))} bytes"
             )
+
+            user = message.from_user
+            if user.username or user.full_name:
+                tg_username = user.username
+                tg_userfn = user.full_name
+            else:
+                tg_username = tg_userfn = None
+            if tg_userfn is not None and isinstance(tg_userfn, str):
+                tg_userfn_clean = tg_userfn.replace("/", "")
+
             receipt_message = await bot.send_photo(
                 ADMIN_TELEGRAM_ID,
                 photo=message.photo[-1].file_id,
                 caption=caption,
-                reply_markup=get_receipt_admin_menu(order_id),
+                parse_mode="MarkdownV2",
+                reply_markup=get_receipt_admin_menu(
+                    order_id,
+                    tg_username,
+                    tg_userfn_clean,  # pyright: ignore[reportPossiblyUnboundVariable]
+                ),
             )
-            await bot.send_message(
-                ADMIN_TELEGRAM_ID,
-                f"لینک رسید: {receipt_url}",
-            )
+            # await bot.send_message(
+            #     ADMIN_TELEGRAM_ID,
+            #     f"لینک رسید: {receipt_url}",
+            # )
             await update_order(
                 order_id,
                 {
@@ -115,27 +143,42 @@ async def handle_receipt(message: Message, bot: Bot):
                     "telegram_id": user_id,
                 },
             )
-            await message.reply(
-                "رسید شما برای ادمین ارسال شد! منتظر تأیید باشید.",
-                reply_markup=get_main_menu(),
+            (
+                await message.reply(
+                    "رسید شما برای ادمین ارسال شد! منتظر تأیید باشید.",
+                    reply_markup=get_main_menu(),
+                )
+                if not is_admin_user
+                else await message.reply(
+                    "رسید شما برای ادمین ارسال شد! منتظر تأیید باشید.",
+                    reply_markup=get_admin_menu(),
+                )
             )
     except Exception as e:
         logger.error(f"Failed to process receipt for order {order_id}: {e}")
-        await message.reply(
-            f"خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.: {str(e)}",
-            reply_markup=get_main_menu(),
+        (
+            await message.reply(
+                f"خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.: {str(e)}",
+                reply_markup=get_main_menu(),
+            )
+            if not is_admin_user
+            else await message.reply(
+                f"خطا در ذخیره رسید! لطفاً دوباره تلاش کنید.: {str(e)}",
+                reply_markup=get_admin_menu(),
+            )
         )
 
 
 @router.callback_query(lambda c: c.data.startswith(("confirm_", "reject_")))
 async def process_order_action(callback: CallbackQuery, bot: Bot):
-    if not await is_admin(callback.from_user.id):
+    is_admin_user = await is_admin(callback.from_user.id)
+    if not is_admin_user:
         await callback.answer(
             "❌ فقط ادمین می‌تونه این عملیات رو انجام بده!", show_alert=True
         )
         return
     if callback.data:
-        action, order_id = callback.data.split("_")
+        action, order_id, tg_username, tg_userfn = callback.data.split("/")
 
         logger.info(f"Processing {action} for order {order_id}")
 
@@ -174,7 +217,11 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                         users,
                     )
                 else:
-                    username = f"user_{uuid.uuid4().hex[:8]}"
+                    username = (
+                        f"{tg_userfn}: @{tg_username}"
+                        if tg_username and tg_userfn
+                        else f"user_{uuid.uuid4().hex[:8]}"
+                    )
                     data_limit = int(plan["data_limit"])
                     expire_days = int(plan["expire_days"])
                     users = plan["users"]
@@ -209,11 +256,20 @@ async def process_order_action(callback: CallbackQuery, bot: Bot):
                             f"لطفاً این لینک رو ذخیره کن یا از /getlink برای دریافت مجدد استفاده کن."
                         )
                     )
-                    await bot.send_message(
-                        telegram_id,
-                        message_text,
-                        parse_mode="markdown",
-                        reply_markup=get_main_menu(),
+                    (
+                        await bot.send_message(
+                            telegram_id,
+                            message_text,
+                            parse_mode="markdown",
+                            reply_markup=get_main_menu(),
+                        )
+                        if not is_admin_user
+                        else await bot.send_message(
+                            telegram_id,
+                            message_text,
+                            parse_mode="markdown",
+                            reply_markup=get_admin_menu(),
+                        )
                     )
                     if (
                         isinstance(callback.message, Message)
