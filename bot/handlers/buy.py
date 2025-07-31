@@ -40,7 +40,7 @@ async def buy_command(message: Message, bot: Bot):
             reply_markup=get_channel_join_keyboard(),
         )
         return
-    await message.reply(
+    await message.answer(
         "*لطفاً نوع اکانت رو انتخاب کن:*",
         parse_mode="Markdown",
         reply_markup=get_buy_menu(),
@@ -101,6 +101,14 @@ async def process_buy_type(callback: CallbackQuery, bot: Bot):
             await callback.message.delete()
             if callback.data:
                 category = callback.data.split("_")[1]
+                if category == "volume":
+                    plan_dsc = "**حجمی**"
+                elif category == "unlimited":
+                    plan_dsc = "**نامحدود**"
+                elif category == "test":
+                    plan_dsc = "**تست**"
+                else:
+                    plan_dsc = "**نامشخص**"
                 logger.debug(f"Selected category: {category}")
                 if category == "back":
                     await callback.message.answer(
@@ -110,7 +118,7 @@ async def process_buy_type(callback: CallbackQuery, bot: Bot):
                     )
                 else:
                     await callback.message.answer(
-                        f"*لطفاً پلن {category} رو انتخاب کن:*",
+                        f"*لطفاً پلن {plan_dsc} رو انتخاب کن:*",
                         parse_mode="Markdown",
                         reply_markup=get_plan_menu(category),
                     )
@@ -152,9 +160,9 @@ async def process_plan_selection(callback: CallbackQuery, bot: Bot):
         if flag == "back":
             if callback.message:
                 await callback.message.answer(
-                    "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
+                    "*لطفاً نوع اکانت رو انتخاب کن:*",
                     parse_mode="Markdown",
-                    reply_markup=get_main_menu_inline(),
+                    reply_markup=get_buy_menu(),
                 )
         else:
             plan_id = callback.data.replace("select_", "")
