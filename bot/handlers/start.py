@@ -109,56 +109,56 @@ async def process_main_type(callback: CallbackQuery, bot: Bot):
             )
         await callback.answer()
         return
-
-    if callback.data:
-        category = callback.data.split("_")[1]
-        logger.debug(f"Selected category: {category}")
-        if category == "status":
-            try:
-                if isinstance(callback.message, Message):
-                    await callback.message.delete()
-                    await status_command(callback.message, bot)
-            except Exception as e:
-                logger.error(f"Error in main_status: {str(e)}")
-                if callback.message:
-                    await callback.message.answer(
-                        "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                        parse_mode="Markdown",
-                    )
-        elif category == "buy":
-            try:
-                if isinstance(callback.message, Message):
-                    await callback.message.delete()
-                    await buy_command(callback.message, bot)
-            except Exception as e:
-                logger.error(f"Error in main_buy: {str(e)}")
-                if callback.message:
-                    await callback.message.answer(
-                        "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                        parse_mode="Markdown",
-                    )
-        elif category == "renew":
-            try:
-                if isinstance(callback.message, Message):
-                    await callback.message.delete()
-                    await renew_command(callback.message, bot)
-            except Exception as e:
-                logger.error(f"Error in main_renew: {str(e)}")
-                if callback.message:
-                    await callback.message.answer(
-                        "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                        parse_mode="Markdown",
-                    )
-        elif category == "getlink":
-            try:
-                if isinstance(callback.message, Message):
-                    await callback.message.delete()
-                    await getlink_command(callback.message, bot)
-            except Exception as e:
-                logger.error(f"Error in main_getlink: {str(e)}")
-                if callback.message:
-                    await callback.message.answer(
-                        "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
-                        parse_mode="Markdown",
-                    )
+    if isinstance(callback.message, Message):
+        try:
+            await callback.message.delete()
+            if callback.data:
+                category = callback.data.split("_")[1]
+                logger.debug(f"Selected category: {category}")
+                if category == "status":
+                    try:
+                        await status_command(callback.message, bot)
+                    except Exception as e:
+                        logger.error(f"Error in main_status: {str(e)}")
+                        if callback.message:
+                            await callback.message.answer(
+                                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                parse_mode="Markdown",
+                            )
+                elif category == "buy":
+                    try:
+                        await buy_command(callback.message, bot)
+                    except Exception as e:
+                        logger.error(f"Error in main_buy: {str(e)}")
+                        if callback.message:
+                            await callback.message.answer(
+                                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                parse_mode="Markdown",
+                            )
+                elif category == "renew":
+                    try:
+                        await renew_command(callback.message, bot)
+                    except Exception as e:
+                        logger.error(f"Error in main_renew: {str(e)}")
+                        if callback.message:
+                            await callback.message.answer(
+                                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                parse_mode="Markdown",
+                            )
+                elif category == "getlink":
+                    try:
+                        await getlink_command(callback.message, bot)
+                    except Exception as e:
+                        logger.error(f"Error in main_getlink: {str(e)}")
+                        if callback.message:
+                            await callback.message.answer(
+                                "❌ *خطایی رخ داد! لطفاً دوباره امتحان کنید.*",
+                                parse_mode="Markdown",
+                            )
+        except TelegramBadRequest as e:
+            logger.warning(f"Failed to delete message in process_buy_type: {e}")
+    else:
+        logger.warning(
+            "callback.message is not deletable (InaccessibleMessage or None)"
+        )
     await callback.answer()

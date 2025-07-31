@@ -96,34 +96,30 @@ async def process_buy_type(callback: CallbackQuery, bot: Bot):
             )
         await callback.answer()
         return
-    # if isinstance(callback.message, Message):
-    #     try:
-    #         await callback.message.delete()
-    #     except TelegramBadRequest as e:
-    #         logger.warning(f"Failed to delete message in process_buy_type: {e}")
-    # else:
-    #     logger.warning(
-    #         "callback.message is not deletable (InaccessibleMessage or None)"
-    #     )
-    if callback.data:
-        category = callback.data.split("_")[1]
-        logger.debug(f"Selected category: {category}")
-        if category == "back":
-            if isinstance(callback.message, Message):
-                await callback.message.delete()
-                await callback.message.answer(
-                    "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_menu_inline(),
-                )
-        else:
-            if isinstance(callback.message, Message):
-                await callback.message.delete()
-                await callback.message.answer(
-                    f"*لطفاً پلن {category} رو انتخاب کن:*",
-                    parse_mode="Markdown",
-                    reply_markup=get_plan_menu(category),
-                )
+    if isinstance(callback.message, Message):
+        try:
+            await callback.message.delete()
+            if callback.data:
+                category = callback.data.split("_")[1]
+                logger.debug(f"Selected category: {category}")
+                if category == "back":
+                    await callback.message.answer(
+                        "*به منوی اصلی خوش اومدی!* 😊\nلطفاً یک گزینه انتخاب کن:",
+                        parse_mode="Markdown",
+                        reply_markup=get_main_menu_inline(),
+                    )
+                else:
+                    await callback.message.answer(
+                        f"*لطفاً پلن {category} رو انتخاب کن:*",
+                        parse_mode="Markdown",
+                        reply_markup=get_plan_menu(category),
+                    )
+        except TelegramBadRequest as e:
+            logger.warning(f"Failed to delete message in process_buy_type: {e}")
+    else:
+        logger.warning(
+            "callback.message is not deletable (InaccessibleMessage or None)"
+        )
     await callback.answer()
 
 
